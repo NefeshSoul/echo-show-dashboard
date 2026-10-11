@@ -148,13 +148,13 @@
     <div class="acct">
       <h3>Account 1</h3>
       <label>Label<input data-f="label" placeholder="e.g. TJ" autocomplete="off"></label>
-      <label>Feed URL<input data-f="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      <label>Feed URL<input data-f="url" inputmode="url" placeholder="tinyurl code or full URL" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <label>Secret key <span style="color:var(--faint)">(optional — for completing tasks later)</span><input data-f="key" type="password" placeholder="leave empty for now" autocomplete="off"></label>
     </div>
     <div class="acct">
       <h3>Account 2</h3>
       <label>Label<input data-f="label" placeholder="e.g. Sam" autocomplete="off"></label>
-      <label>Feed URL<input data-f="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      <label>Feed URL<input data-f="url" inputmode="url" placeholder="tinyurl code or full URL" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <label>Secret key <span style="color:var(--faint)">(optional — for completing tasks later)</span><input data-f="key" type="password" placeholder="leave empty for now" autocomplete="off"></label>
     </div>
     <div class="row">
@@ -197,6 +197,16 @@ function getFeeds(){
 }
 function saveFeeds(feeds){
   try{ localStorage.setItem(LS_FEEDS, JSON.stringify(feeds)); }catch(e){}
+}
+/* Convenience: typing just the tinyurl code (e.g. "25hv99qa") expands to
+ * the full short URL. Full https:// URLs pass through untouched. */
+function normalizeFeedUrl(u){
+  u = String(u || "").trim();
+  if (!u) return u;
+  if (!/^https?:\/\//i.test(u)){
+    u = "https://tinyurl.com/" + u.replace(/^tinyurl\.com\//i, "");
+  }
+  return u;
 }
 
 function loadJsonp(url){
@@ -419,7 +429,7 @@ load(); setInterval(load, REFRESH_MS);
   document.getElementById("saveSettings").addEventListener("click", function(){
     var feeds = [];
     document.querySelectorAll(".acct").forEach(function(box){
-      var url = box.querySelector('[data-f="url"]').value.trim();
+      var url = normalizeFeedUrl(box.querySelector('[data-f="url"]').value);
       if (!url) return;
       feeds.push({
         label: box.querySelector('[data-f="label"]').value.trim(),
