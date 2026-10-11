@@ -8,7 +8,8 @@
  * SETUP (5 minutes, one time):
  *  1. Go to script.google.com → New project → paste this file.
  *  2. Project Settings (gear) → Time zone → (GMT-07:00) Phoenix.
- *  3. Extensions → Advanced Google services → turn ON "Tasks API".
+ *  3. In the left sidebar, next to **Services**, click **+** (Add a service)
+ *     → select **Tasks API** → **Add**.
  *  4. Deploy → New deployment → type: Web app
  *       Execute as: Me
  *       Who has access: Anyone
