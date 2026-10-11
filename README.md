@@ -72,7 +72,8 @@ Per account:
    *Who has access:* **Anyone** → Deploy → authorize → copy the `/exec` URL.
 5. On the Echo Show, tap the **⚙** button → Account 1: label (e.g. `TJ`) +
    your `/exec` URL; Account 2: label + the second account's `/exec` URL →
-   Save. (Tip: shorten the exec URLs first — less typing on the Show.)
+   Save. (Tip: shorten the exec URLs first — on the Show you only need to
+   type the tinyurl code part, e.g. `25hv99qa`.)
 
 URLs stay on the device and never land in this public repo.
 
