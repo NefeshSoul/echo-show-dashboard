@@ -252,6 +252,14 @@
     <p class="hint">Deploy the Apps Script once per Google account (see README),
       then paste each feed URL below. Labels show whose items are whose.</p>
     <div class="acct">
+      <h3>Quick setup</h3>
+      <label>Setup code<input id="quickCode" placeholder="5-character code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="16"></label>
+      <div class="row">
+        <button id="quickLoad" type="button">Load from code</button>
+      </div>
+      <p class="hint" id="quickStatus" style="margin:12px 0 0" aria-live="polite"></p>
+    </div>
+    <div class="acct">
       <h3>Account 1</h3>
       <label>Label<input data-f="label" placeholder="e.g. TJ" autocomplete="off"></label>
       <label>Feed URL<input data-f="url" inputmode="url" placeholder="tinyurl code or full URL" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
@@ -285,11 +293,13 @@
 <script>
 "use strict";
 /* ------------------------------------------------------------------
- * DATA: feed URLs live ON THE DEVICE (localStorage), set via the ⚙ panel —
- * never in this public repo. Supports two accounts; each feed's items are
- * tagged with its label. Without configured feeds it tries ./data.json,
- * then demo data. (Apps Script doesn't send CORS headers, so feeds load
- * via JSONP.)
+ * DATA: feed URLs live ON THE DEVICE (localStorage), set via the ⚙ panel.
+ * An opt-in "<code>.json" quick-setup file may also live in this public
+ * repo — anyone who can read the repo can read those URLs/keys, so treat
+ * them as public. Supports two accounts; each feed's items are tagged
+ * with its label. Without configured feeds it tries ./data.json, then
+ * demo data. (Apps Script doesn't send CORS headers, so feeds load via
+ * JSONP.)
  * ------------------------------------------------------------------ */
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
@@ -817,6 +827,35 @@ load(); setInterval(load, REFRESH_MS);
   });
   overlay.addEventListener("click", function(e){
     if (e.target === overlay) overlay.hidden = true;
+  });
+  /* Quick setup: fetch <code>.json from this site, fill the form, save. */
+  document.getElementById("quickLoad").addEventListener("click", function(){
+    var status = document.getElementById("quickStatus");
+    var code = document.getElementById("quickCode").value.replace(/[^A-Za-z0-9]/g, "").slice(0, 32);
+    if (code.length < 3){ status.textContent = "Enter your setup code."; return; }
+    status.textContent = "Loading…";
+    fetch(code + ".json", {cache: "no-store"}).then(function(r){
+      if (!r.ok) throw new Error("not found");
+      return r.json();
+    }).then(function(data){
+      var feeds = ((data && data.feeds) || []).filter(function(f){ return f && f.url; }).slice(0, 2);
+      if (!feeds.length) throw new Error("empty");
+      var boxes = Array.prototype.filter.call(document.querySelectorAll(".acct"), function(box){
+        return !!box.querySelector('[data-f="label"]');
+      });
+      boxes.forEach(function(box, i){
+        var f = feeds[i] || {};
+        box.querySelector('[data-f="label"]').value = f.label || "";
+        box.querySelector('[data-f="url"]').value = f.url || "";
+        box.querySelector('[data-f="key"]').value = f.key || "";
+        box.querySelector('[data-f="cal"]').checked = f.cal !== false;
+        box.querySelector('[data-f="tasks"]').checked = f.tasks !== false;
+      });
+      status.textContent = "Loaded — saving…";
+      document.getElementById("saveSettings").click();
+    }).catch(function(){
+      status.textContent = "Code not found — check it and try again.";
+    });
   });
   document.getElementById("saveSettings").addEventListener("click", function(){
     var feeds = [];
