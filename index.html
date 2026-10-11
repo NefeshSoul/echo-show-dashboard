@@ -110,6 +110,42 @@
     border:1px solid var(--warn); color:var(--warn); display:none}
   body.demo .badge{display:inline-block}
 
+  .sechead{display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:18px; flex:0 0 auto}
+  .sechead h2{margin-bottom:0}
+  .seg{display:flex; background:#0a0e16; border:1px solid var(--line);
+    border-radius:12px; padding:4px; gap:4px}
+  .seg button{background:transparent; border:none; color:var(--dim);
+    font-size:16px; padding:9px 16px; border-radius:8px; cursor:pointer}
+  .seg button.on{background:#26314a; color:var(--ink); font-weight:600}
+  .dayhead{font-size:17px; text-transform:uppercase; letter-spacing:2px;
+    color:var(--accent); margin:20px 0 4px}
+  .dayhead:first-child{margin-top:0}
+  #tasks{overflow:hidden; flex:1 1 auto; min-height:0; display:flex}
+  .tblocks{display:grid; gap:26px; height:100%; width:100%}
+  .tblocks.cols2{grid-template-columns:1fr 1fr}
+  .tblock{display:flex; flex-direction:column; min-height:0}
+  .accthead{font-size:21px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--accent); margin-bottom:12px; flex:0 0 auto}
+  .tscroll{flex:1 1 auto; overflow-y:auto; scrollbar-width:none; min-height:0}
+  .tscroll::-webkit-scrollbar{display:none}
+  .cols2 .task{font-size:22px}
+  .weekgrid{display:grid; grid-template-columns:repeat(7,1fr); gap:10px;
+    height:100%; min-height:0}
+  .weekgrid .day{background:var(--panel2); border:1px solid var(--line);
+    border-radius:12px; padding:10px; overflow:hidden}
+  .weekgrid .day.today{border-color:var(--accent)}
+  .weekgrid .day h4{display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom:6px}
+  .weekgrid .day h4 span{font-size:13px; text-transform:uppercase;
+    letter-spacing:1px; color:var(--dim)}
+  .weekgrid .day h4 b{font-size:22px}
+  .weekgrid .day.today h4 b{color:var(--accent)}
+  .evt{font-size:14px; line-height:1.35; margin-top:9px; word-break:break-word}
+  .evt .t{display:block; font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums}
+  .evt.allday .t{color:var(--accent)}
+  .evt.none{color:var(--faint)}
+
   @media (orientation:portrait){
     main{grid-template-columns:1fr; grid-template-rows:1fr 1fr}
     .clock{font-size:64px}
@@ -127,12 +163,18 @@
 </header>
 <main>
   <section>
-    <h2>Today's Agenda</h2>
+    <div class="sechead">
+      <h2>Calendar</h2>
+      <div class="seg" role="radiogroup" aria-label="Calendar view">
+        <button type="button" data-view="agenda" class="on">Agenda</button>
+        <button type="button" data-view="week">Week</button>
+      </div>
+    </div>
     <div class="scroll" id="agenda"></div>
   </section>
   <section>
     <h2>Tasks</h2>
-    <div class="scroll" id="tasks"></div>
+    <div id="tasks"></div>
   </section>
 </main>
 <footer>
@@ -226,55 +268,152 @@ function loadJsonp(url){
   });
 }
 
+function dstr(off){
+  const d = new Date(); d.setDate(d.getDate() + off);
+  return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+}
+
 const MOCK = {
-  agenda: [
-    { start: "07:00", end: "07:45", title: "Morning run", location: "Papago Park" },
-    { start: "10:30", end: "11:30", title: "Grocery run", location: "Whole Foods" },
-    { start: "13:00", end: "14:00", title: "Call with accountant", location: "" },
-    { start: "18:30", end: "20:00", title: "Dinner with Sam", location: "FnB" }
-  ],
-  taskLists: [
-    { name: "Today", tasks: [
-      { title: "Review Q4 ad spend report", due: "today" },
-      { title: "Water the plants", due: "today" },
-      { title: "Book dentist appointment", due: "overdue" }
-    ]},
-    { name: "This week", tasks: [
-      { title: "Draft Nefesh launch notes", due: "2026-10-14" },
-      { title: "Rotate tires", due: "2026-10-16" }
-    ]}
+  feeds: [
+    { label: "TJ",
+      agenda: [
+        { date: dstr(0), start: "07:00", end: "07:45", title: "Morning run", location: "Papago Park", cal: "Personal" },
+        { date: dstr(0), start: "18:30", end: "20:00", title: "Dinner", location: "FnB", cal: "Personal" },
+        { date: dstr(1), start: "09:00", end: "10:00", title: "Dentist", location: "", cal: "Personal" },
+        { date: dstr(3), start: "All day", end: "", title: "Trip to Tucson", location: "", cal: "Family" }
+      ],
+      taskLists: [
+        { name: "Today", tasks: [
+          { title: "Review Q4 ad spend report", due: "today" },
+          { title: "Water the plants", due: "today" },
+          { title: "Book dentist appointment", due: "overdue" }
+        ]},
+        { name: "This week", tasks: [
+          { title: "Draft Nefesh launch notes", due: dstr(4) },
+          { title: "Rotate tires", due: dstr(6) }
+        ]}
+      ] },
+    { label: "Kelley",
+      agenda: [
+        { date: dstr(0), start: "10:30", end: "11:30", title: "Grocery run", location: "Whole Foods", cal: "Personal" },
+        { date: dstr(2), start: "12:00", end: "13:00", title: "Lunch with Priya", location: "", cal: "Personal" }
+      ],
+      taskLists: [
+        { name: "Errands", tasks: [
+          { title: "Pick up dry cleaning", due: "today" },
+          { title: "Buy birthday gift", due: dstr(2) }
+        ]}
+      ] }
   ]
 };
 
 function toMin(hhmm){ const [h,m] = hhmm.split(":").map(Number); return h*60+m; }
 function nowMin(){ const d = new Date(); return d.getHours()*60 + d.getMinutes(); }
 
-function renderAgenda(el, agenda){
+function getCalView(){
+  try{ return localStorage.getItem("tb-calview") || "agenda"; }catch(e){ return "agenda"; }
+}
+function setCalView(v){
+  try{ localStorage.setItem("tb-calview", v); }catch(e){}
+}
+
+function dayLabel(dateStr){
+  if (dateStr === dstr(0)) return "Today";
+  if (dateStr === dstr(1)) return "Tomorrow";
+  return new Date(dateStr + "T12:00:00")
+    .toLocaleDateString(undefined, {weekday: "long", month: "short", day: "numeric"});
+}
+
+function eventRow(e, isToday, multi){
   const now = nowMin();
-  if(!agenda.length){ el.innerHTML = '<div class="empty">Nothing scheduled today.</div>'; return; }
-  el.innerHTML = agenda.map(e => {
-    const allDay = !e.end;
-    const s = allDay ? -1 : toMin(e.start), en = allDay ? -1 : toMin(e.end);
-    const cls = !allDay && now >= s && now < en ? "now" : (!allDay && now >= en ? "past" : "");
-    const when = e.end ? `${e.start}–${e.end}` : e.start; // all-day: single label
-    const sub = e.sub !== undefined ? e.sub : [e.cal, e.location].filter(Boolean).join(" · ");
-    return `<div class="event ${cls}">
-      <div class="etime">${when}</div><div class="bar"></div>
+  const allDay = !e.end;
+  const s = allDay ? -1 : toMin(e.start), en = allDay ? -1 : toMin(e.end);
+  const cls = isToday && !allDay && now >= s && now < en ? "now"
+            : (isToday && !allDay && now >= en ? "past" : "");
+  const sub = (multi && e._acct ? [e._acct] : []).concat([e.cal, e.location])
+    .filter(Boolean).join(" · ");
+  return `<div class="event ${cls}">
+      <div class="etime">${esc(e.start)}${e.end ? "–" + esc(e.end) : ""}</div><div class="bar"></div>
       <div><div class="etitle">${esc(e.title)}</div>
       ${sub ? `<div class="eloc">${esc(sub)}</div>` : ""}</div>
     </div>`;
-  }).join("");
 }
 
-function renderTasks(el, lists){
+function renderCalendar(el, feeds){
+  const view = getCalView();
+  document.querySelectorAll(".seg button").forEach(b => {
+    const on = b.dataset.view === view;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", String(on));
+  });
+  const multi = feeds.length > 1;
+  const byDay = {};
+  feeds.forEach(f => (f.agenda || []).forEach(e => {
+    const dt = e.date || dstr(0); // old feeds without dates land on today
+    (byDay[dt] = byDay[dt] || []).push(Object.assign({}, e, {_acct: f.label}));
+  }));
+  Object.keys(byDay).forEach(dt => byDay[dt].sort((a, b) => {
+    const ad = !a.end, bd = !b.end;
+    if (ad && !bd) return -1;
+    if (bd && !ad) return 1;
+    return a.start < b.start ? -1 : 1;
+  }));
+
+  if (view === "week"){ el.innerHTML = weekHtml(byDay); return; }
+
+  let html = "";
+  for (let i = 0; i < 7; i++){
+    const dt = dstr(i);
+    const evs = byDay[dt] || [];
+    if (!evs.length && i !== 0) continue;
+    html += `<div class="dayhead">${esc(dayLabel(dt))}</div>`;
+    html += evs.length
+      ? evs.map(e => eventRow(e, i === 0, multi)).join("")
+      : `<div class="empty">Nothing scheduled.</div>`;
+  }
+  el.innerHTML = html || `<div class="empty">Nothing scheduled this week.</div>`;
+}
+
+function weekHtml(byDay){
+  let html = '<div class="weekgrid">';
+  for (let i = 0; i < 7; i++){
+    const dt = dstr(i);
+    const d = new Date(dt + "T12:00:00");
+    const evs = byDay[dt] || [];
+    html += `<div class="day${i === 0 ? " today" : ""}">` +
+      `<h4><span>${esc(d.toLocaleDateString(undefined, {weekday: "short"}))}</span>` +
+      `<b>${d.getDate()}</b></h4>` +
+      (evs.length ? evs.map(e =>
+        `<div class="evt${e.end ? "" : " allday"}">` +
+        (e.end ? `<span class="t">${esc(e.start)}</span>` : `<span class="t">all day</span>`) +
+        `<span>${esc(e.title)}</span></div>`
+      ).join("") : `<div class="evt none">—</div>`) +
+      `</div>`;
+  }
+  return html + "</div>";
+}
+
+function renderTasks(el, feeds){
+  const multi = feeds.length > 1;
+  el.innerHTML = '<div class="tblocks' + (multi ? " cols2" : "") + '">' + feeds.map((f, i) =>
+    '<div class="tblock">' +
+    (multi ? '<h3 class="accthead">' + esc(f.label || ("Account " + (i + 1))) + "</h3>" : "") +
+    '<div class="tscroll">' +
+      ((f.taskLists && f.taskLists.length)
+        ? f.taskLists.map(tlistHtml).join("")
+        : '<div class="empty">No open tasks.</div>') +
+    "</div></div>"
+  ).join("") + "</div>";
+}
+
+function tlistHtml(l){
   const today = new Date(); today.setHours(0,0,0,0);
-  el.innerHTML = lists.map(l => `
-    <div class="tlist"><h3>${esc(l.name)}</h3>
-    ${l.tasks.map(t => {
+  return `<div class="tlist"><h3>${esc(l.name)}</h3>` +
+    l.tasks.map(t => {
       let dueLabel = "", dueCls = "";
       if(t.due === "today"){ dueLabel = "today"; dueCls = "today"; }
       else if(t.due === "overdue"){ dueLabel = "overdue"; dueCls = "overdue"; }
-      else if(t.due){ 
+      else if(t.due){
         const d = new Date(t.due + "T12:00:00");
         dueLabel = d.toLocaleDateString(undefined, {month:"short", day:"numeric"});
         if(d < today){ dueCls = "overdue"; }
@@ -282,65 +421,58 @@ function renderTasks(el, lists){
       return `<div class="task"><div class="box"></div>
         <div class="t">${esc(t.title)}</div>
         ${dueLabel ? `<div class="due ${dueCls}">${esc(dueLabel)}</div>` : ""}</div>`;
-    }).join("")}</div>`).join("");
+    }).join("") + `</div>`;
 }
 
 function esc(s){ return String(s).replace(/[&<>"']/g, c =>
   ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
+let lastFeeds = [];
+
 async function load(){
-  let agenda = [], taskLists = [], demo = false;
-  const feeds = getFeeds();
-  if (feeds.length){
-    const settled = await Promise.all(feeds.map(f =>
+  let feeds = [], demo = false;
+  const cfg = getFeeds();
+  if (cfg.length){
+    const settled = await Promise.all(cfg.map(f =>
       loadJsonp(f.url).then(d => ({feed: f, data: d})).catch(() => null)
     ));
     const ok = settled.filter(Boolean);
-    if (!ok.length){
-      demo = true;
-    } else {
-      const multi = ok.length > 1;
-      ok.forEach(function(res, i){
-        const label = (res.feed.label || (res.data && res.data.owner) || ("Account " + (i + 1))).trim();
-        (res.data.agenda || []).forEach(e => {
-          agenda.push(Object.assign({}, e, {
-            sub: multi ? [label, e.cal, e.location].filter(Boolean).join(" · ")
-                       : [e.cal, e.location].filter(Boolean).join(" · ")
-          }));
-        });
-        (res.data.taskLists || []).forEach(l => {
-          taskLists.push({
-            name: multi ? label + " · " + l.name : l.name,
-            tasks: l.tasks || [],
-            _feed: i
-          });
-        });
-      });
-      agenda.sort(function(a, b){
-        const ad = !a.end, bd = !b.end;
-        if (ad && !bd) return -1;
-        if (bd && !ad) return 1;
-        return a.start < b.start ? -1 : (a.start > b.start ? 1 : 0);
-      });
-    }
+    if (!ok.length){ demo = true; }
+    else feeds = ok.map(function(res, i){
+      return {
+        label: (res.feed.label || (res.data && res.data.owner) || ("Account " + (i + 1))).trim(),
+        agenda: res.data.agenda || [],
+        taskLists: res.data.taskLists || [],
+        idx: i
+      };
+    });
   } else {
     try{
       const r = await fetch(LOCAL_URL, {cache:"no-store"});
       if(!r.ok) throw new Error("http " + r.status);
       const data = await r.json();
-      agenda = data.agenda || []; taskLists = data.taskLists || [];
+      feeds = [{label: "", agenda: data.agenda || [], taskLists: data.taskLists || [], idx: 0}];
     }catch(e){ demo = true; }
   }
-  if (demo){ agenda = MOCK.agenda; taskLists = MOCK.taskLists; }
+  if (demo) feeds = MOCK.feeds;
+  lastFeeds = feeds;
   document.body.classList.toggle("demo", demo);
-  renderAgenda(document.getElementById("agenda"), agenda);
-  renderTasks(document.getElementById("tasks"), taskLists);
+  renderAll();
   const stamp = "updated " + new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
   document.getElementById("updated").textContent = demo
-    ? (feeds.length ? stamp + " · demo data (feeds unreachable)"
-                    : stamp + " · demo data — tap ⚙ to add your feeds")
+    ? (cfg.length ? stamp + " \u00b7 demo data (feeds unreachable)"
+                  : stamp + " \u00b7 demo data \u2014 tap \u2699 to add your feeds")
     : stamp;
 }
+
+function renderAll(){
+  renderCalendar(document.getElementById("agenda"), lastFeeds);
+  renderTasks(document.getElementById("tasks"), lastFeeds);
+}
+
+document.querySelectorAll(".seg button").forEach(function(b){
+  b.addEventListener("click", function(){ setCalView(b.dataset.view); renderAll(); });
+});
 
 function tickClock(){
   const d = new Date();
