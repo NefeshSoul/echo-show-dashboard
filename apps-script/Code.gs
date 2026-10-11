@@ -13,11 +13,11 @@
  *       Execute as: Me
  *       Who has access: Anyone
  *     → Deploy → authorize → copy the /exec URL.
- *  5. On the Echo Show, open the dashboard once as:
- *       https://nefeshsoul.github.io/echo-show-dashboard/#<your /exec URL>
- *     (Tip: shorten the /exec URL first — less typing on the Show.)
- *     The page saves it on the device and scrubs it from the address bar,
- *     so the URL never lands in the public repo.
+ *  5. On the Echo Show, open the dashboard and tap the ⚙ button, then
+ *     paste the /exec URL into Account 1 (tip: shorten it first — less
+ *     typing on the Show). Repeat steps 1–4 signed in as the second
+ *     Google account and add its URL as Account 2. URLs stay on the
+ *     device and never land in the public repo.
  *
  * PRIVACY: "Anyone" means anyone with the link can read the JSON. The link
  * is long and unguessable, and it lives only in your bookmark/on the
@@ -28,7 +28,8 @@ function doGet(e) {
   var callback = (e && e.parameter && e.parameter.callback) || null;
   var payload = {
     agenda: getAgenda(),
-    taskLists: getTaskLists()
+    taskLists: getTaskLists(),
+    owner: getOwner()
   };
   var json = JSON.stringify(payload);
   if (callback) {
@@ -81,10 +82,15 @@ function getTaskLists() {
       tasks: items
         .filter(function (t) { return t.title; })
         .map(function (t) {
-          return { title: t.title, due: normDue(t.due) };
+          return { title: t.title, due: normDue(t.due), id: t.id, list: l.id };
         })
     };
   }).filter(function (l) { return l.tasks.length > 0; });
+}
+
+function getOwner() {
+  try { return Session.getActiveUser().getEmail(); }
+  catch (err) { return ""; }
 }
 
 function fmtTime(d) {
