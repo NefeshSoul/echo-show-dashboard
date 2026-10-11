@@ -11,8 +11,12 @@ all Echo Show devices). Say **"Alexa, open task board"**.
    big clock, calendar section with an Agenda/Week toggle, and task lists in
    side-by-side blocks — one per Google account.
    Data priority: feed URLs saved on the device via the ⚙ settings panel
-   (supports two Google accounts — items are merged and labeled by account)
+   (supports two Google accounts — each account can toggle calendar and
+   tasks independently, so e.g. shared calendars don't show twice)
    → `./data.json` → embedded demo data (with a visible DEMO DATA badge).
+   Calendar events are color-coded by calendar (Google's palette, with a
+   legend); tasks are flattened across lists, sorted by due date (overdue
+   first), each in its list's color with the list names as chips on top.
 2. `skill/` — a custom Alexa skill. On launch it sends
    `Alexa.Presentation.HTML.Start` with your dashboard URL, which loads the
    page full-screen. The skill session stays open while the page is up.
