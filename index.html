@@ -68,7 +68,7 @@
   .dateline .dow{font-size:34px; font-weight:600}
   .dateline .date{font-size:22px; color:var(--dim); margin-top:4px}
   main{
-    flex:1 1 auto; display:grid; grid-template-columns:1.15fr 1fr; gap:28px;
+    flex:1 1 auto; display:grid; grid-template-columns:var(--calpct,50%) 1fr; gap:28px;
     padding:26px 52px; min-height:0;
   }
   section{background:var(--panel); border:1px solid var(--line); border-radius:18px;
@@ -131,7 +131,11 @@
   .tscroll::-webkit-scrollbar{display:none}
   .cols2 .task{font-size:22px}
   .weekgrid{display:grid; grid-template-columns:repeat(7,1fr); gap:10px;
-    height:100%; min-height:0}
+    flex:1 1 auto; min-height:0}
+  .calwrap{display:flex; flex-direction:column; height:100%; min-height:0}
+  .calwrap .callegend{flex:0 0 auto}
+  .weekgrid .day{overflow-y:auto; scrollbar-width:none; min-height:0}
+  .weekgrid .day::-webkit-scrollbar{display:none}
   .weekgrid .day{background:var(--panel2); border:1px solid var(--line);
     border-radius:12px; padding:10px; overflow:hidden}
   .weekgrid .day.today{border-color:var(--accent)}
@@ -160,8 +164,16 @@
   .lchip{font-size:15px; padding:5px 13px; border-radius:20px;
     border:1px solid; white-space:nowrap}
 
+  .task{transition:opacity .35s ease}
+  .task.done{opacity:0}
+  .srow{margin:8px 0 2px}
+  .srow .lab{display:flex; justify-content:space-between; font-size:18px;
+    color:var(--dim); margin-bottom:2px}
+  .srow .lab b{color:var(--ink)}
+  input[type=range]{width:100%; accent-color:var(--accent); height:38px; cursor:pointer}
+
   @media (orientation:portrait){
-    main{grid-template-columns:1fr; grid-template-rows:1fr 1fr}
+    main{grid-template-columns:1fr; grid-template-rows:var(--calpct,50%) 1fr}
     .clock{font-size:64px}
   }
 </style>
@@ -220,6 +232,10 @@
         <label class="chk"><input type="checkbox" data-f="cal" checked> Calendar</label>
         <label class="chk"><input type="checkbox" data-f="tasks" checked> Tasks</label>
       </div>
+    </div>
+    <div class="srow">
+      <div class="lab"><span>Calendar size</span><b id="calSizeVal">50%</b></div>
+      <input type="range" id="calSize" min="20" max="80" step="5" value="50">
     </div>
     <div class="row">
       <button id="saveSettings" type="button">Save</button>
@@ -335,6 +351,17 @@ function nowMin(){ const d = new Date(); return d.getHours()*60 + d.getMinutes()
 function getCalView(){
   try{ return localStorage.getItem("tb-calview") || "agenda"; }catch(e){ return "agenda"; }
 }
+function getCalSize(){
+  try{
+    const v = parseInt(localStorage.getItem("tb-calsize") || "50", 10) || 50;
+    return Math.min(80, Math.max(20, v));
+  }catch(e){ return 50; }
+}
+function applyCalSize(v){
+  document.documentElement.style.setProperty("--calpct", v + "%");
+  const lbl = document.getElementById("calSizeVal");
+  if (lbl) lbl.textContent = v + "%";
+}
 function setCalView(v){
   try{ localStorage.setItem("tb-calview", v); }catch(e){}
 }
@@ -403,7 +430,10 @@ function renderCalendar(el, feeds){
   }));
 
   const legend = calLegend(byDay);
-  if (view === "week"){ el.innerHTML = legend + weekHtml(byDay); return; }
+  if (view === "week"){
+    el.innerHTML = '<div class="calwrap">' + legend + weekHtml(byDay) + "</div>";
+    return;
+  }
 
   let html = legend;
   for (let i = 0; i < 7; i++){
@@ -452,7 +482,7 @@ function renderTasks(el, feeds){
   const taskFeeds = feeds.filter(f => f.tasks !== false);
   const multi = taskFeeds.length > 1;
   el.innerHTML = '<div class="tblocks' + (multi ? " cols2" : "") + '">' + taskFeeds.map((f, i) =>
-    '<div class="tblock">' +
+    '<div class="tblock" data-feed="' + f.idx + '">' +
     (multi ? '<h3 class="accthead">' + esc(f.label || ("Account " + (i + 1))) + "</h3>" : "") +
     '<div class="tscroll">' + taskBlockHtml(f) + "</div></div>"
   ).join("") + "</div>";
@@ -469,7 +499,7 @@ function taskBlockHtml(f){
   const all = [];
   lists.forEach(l => (l.tasks || []).forEach(t =>
     all.push({t: t, list: l.name, color: colorFor(l.name),
-              listId: t.listId || "", id: t.id || ""})));
+              listId: t.list || "", id: t.id || ""})));
   all.sort((a, b) => (dueRank(a.t.due) - dueRank(b.t.due)) ||
                      (a.t.title < b.t.title ? -1 : 1));
   const rows = all.length ? all.map(taskRow).join("")
@@ -515,6 +545,7 @@ async function load(){
         taskLists: res.data.taskLists || [],
         cal: res.feed.cal !== false,
         tasks: res.feed.tasks !== false,
+        execUrl: (res.data && res.data.execUrl) || "",
         idx: i
       };
     });
@@ -543,6 +574,52 @@ function renderAll(){
   renderTasks(document.getElementById("tasks"), lastFeeds);
 }
 
+/* Tap-to-complete: ?action=complete goes to the feed's own exec URL, which the
+ * feed reports in its payload (short links would drop the query params).
+ * The per-account secret key (set in Apps Script properties + here in the
+ * settings panel) guards the write endpoint. */
+function completeTask(feedIdx, listId, taskId, rowEl){
+  const cfg = getFeeds()[feedIdx];
+  const feed = lastFeeds[feedIdx] || {};
+  if (!cfg || !cfg.key || !listId || !taskId){
+    hintFooter("\u2699 \u2192 add a secret key to enable tap-to-complete");
+    return;
+  }
+  rowEl.classList.add("done");
+  const base = feed.execUrl || cfg.url;
+  loadJsonp(base + (base.indexOf("?") >= 0 ? "&" : "?") +
+    "action=complete&listId=" + encodeURIComponent(listId) +
+    "&taskId=" + encodeURIComponent(taskId) +
+    "&key=" + encodeURIComponent(cfg.key))
+  .then(res => {
+    if (res && res.ok){
+      setTimeout(() => { if (rowEl.parentNode) rowEl.parentNode.removeChild(rowEl); }, 380);
+    } else {
+      rowEl.classList.remove("done");
+      hintFooter("Couldn't complete that task \u2014 try again");
+    }
+  })
+  .catch(() => rowEl.classList.remove("done"));
+}
+
+let hintTimer = null;
+function hintFooter(msg){
+  const el = document.getElementById("updated");
+  if (!el) return;
+  el.textContent = msg;
+  if (hintTimer) clearTimeout(hintTimer);
+  hintTimer = setTimeout(load, 3500);
+}
+
+document.getElementById("tasks").addEventListener("click", function(e){
+  const row = e.target && e.target.closest ? e.target.closest(".task") : null;
+  if (!row || row.classList.contains("done")) return;
+  const block = row.closest ? row.closest(".tblock") : null;
+  const feedIdx = block ? parseInt(block.getAttribute("data-feed"), 10) : NaN;
+  if (isNaN(feedIdx)) return;
+  completeTask(feedIdx, row.getAttribute("data-list"), row.getAttribute("data-id"), row);
+});
+
 document.querySelectorAll(".seg button").forEach(function(b){
   b.addEventListener("click", function(){ setCalView(b.dataset.view); renderAll(); });
 });
@@ -561,6 +638,7 @@ function tickClock(){
 }
 
 tickClock(); setInterval(tickClock, 1000);
+applyCalSize(getCalSize());
 load(); setInterval(load, REFRESH_MS);
 
 /* ------------------------------------------------------------------
@@ -625,7 +703,15 @@ load(); setInterval(load, REFRESH_MS);
     });
   }
   document.getElementById("settingsBtn").addEventListener("click", function(){
-    fill(); overlay.hidden = false;
+    fill();
+    document.getElementById("calSize").value = getCalSize();
+    applyCalSize(getCalSize());
+    overlay.hidden = false;
+  });
+  document.getElementById("calSize").addEventListener("input", function(e){
+    const v = Math.min(80, Math.max(20, parseInt(e.target.value, 10) || 50));
+    try{ localStorage.setItem("tb-calsize", String(v)); }catch(err){}
+    applyCalSize(v);
   });
   document.getElementById("cancelSettings").addEventListener("click", function(){
     overlay.hidden = true;
