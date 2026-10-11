@@ -747,6 +747,7 @@ load(); setInterval(load, REFRESH_MS);
  * hides browser chrome in browsers that honor it.
  * ------------------------------------------------------------------ */
 (function silkKeepAlive(){
+  if (!IS_SILK) return; /* silent-audio keep-alive only matters on the Echo Show; pointless on desktop */
   function silentWavURL(seconds, rate){
     seconds = seconds || 2; rate = rate || 8000;
     var n = Math.floor(seconds * rate);
