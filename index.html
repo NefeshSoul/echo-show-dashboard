@@ -146,6 +146,20 @@
   .evt.allday .t{color:var(--accent)}
   .evt.none{color:var(--faint)}
 
+  .toggles{display:flex; gap:26px; margin-top:2px}
+  .chk{display:flex; align-items:center; gap:10px; font-size:18px;
+    color:var(--dim); cursor:pointer}
+  .chk input{width:24px; height:24px; accent-color:var(--accent); cursor:pointer}
+  .panel{overflow-y:auto}
+  .callegend{display:flex; flex-wrap:wrap; gap:6px 18px; margin-bottom:14px;
+    font-size:15px; color:var(--dim); flex:0 0 auto}
+  .callegend .cdot{width:11px; height:11px; border-radius:50%;
+    display:inline-block; margin-right:7px}
+  .evt{border-left:3px solid transparent; padding-left:7px}
+  .listchips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; flex:0 0 auto}
+  .lchip{font-size:15px; padding:5px 13px; border-radius:20px;
+    border:1px solid; white-space:nowrap}
+
   @media (orientation:portrait){
     main{grid-template-columns:1fr; grid-template-rows:1fr 1fr}
     .clock{font-size:64px}
@@ -192,12 +206,20 @@
       <label>Label<input data-f="label" placeholder="e.g. TJ" autocomplete="off"></label>
       <label>Feed URL<input data-f="url" inputmode="url" placeholder="tinyurl code or full URL" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <label>Secret key <span style="color:var(--faint)">(optional — for completing tasks later)</span><input data-f="key" type="password" placeholder="leave empty for now" autocomplete="off"></label>
+      <div class="toggles">
+        <label class="chk"><input type="checkbox" data-f="cal" checked> Calendar</label>
+        <label class="chk"><input type="checkbox" data-f="tasks" checked> Tasks</label>
+      </div>
     </div>
     <div class="acct">
       <h3>Account 2</h3>
       <label>Label<input data-f="label" placeholder="e.g. Sam" autocomplete="off"></label>
       <label>Feed URL<input data-f="url" inputmode="url" placeholder="tinyurl code or full URL" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <label>Secret key <span style="color:var(--faint)">(optional — for completing tasks later)</span><input data-f="key" type="password" placeholder="leave empty for now" autocomplete="off"></label>
+      <div class="toggles">
+        <label class="chk"><input type="checkbox" data-f="cal" checked> Calendar</label>
+        <label class="chk"><input type="checkbox" data-f="tasks" checked> Tasks</label>
+      </div>
     </div>
     <div class="row">
       <button id="saveSettings" type="button">Save</button>
@@ -317,6 +339,26 @@ function setCalView(v){
   try{ localStorage.setItem("tb-calview", v); }catch(e){}
 }
 
+/* Google Calendar's own palette; a name hashes to a stable color. */
+const PALETTE = ["#7986cb","#33b679","#8e24aa","#e67c73","#f6bf26","#f4511e",
+  "#039be5","#616161","#3f51b5","#0b8043","#d50000","#795548"];
+function colorFor(name){
+  let h = 0;
+  const s = String(name || "?");
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
+/* Sort order: overdue (-1) < today (0) < dated < undated. */
+function dueRank(due){
+  if (due === "overdue") return -1;
+  if (due === "today") return 0;
+  if (due){
+    const t = new Date(due + "T12:00:00").getTime();
+    return isNaN(t) ? Number.MAX_SAFE_INTEGER : t;
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
 function dayLabel(dateStr){
   if (dateStr === dstr(0)) return "Today";
   if (dateStr === dstr(1)) return "Tomorrow";
@@ -333,7 +375,7 @@ function eventRow(e, isToday, multi){
   const sub = (multi && e._acct ? [e._acct] : []).concat([e.cal, e.location])
     .filter(Boolean).join(" · ");
   return `<div class="event ${cls}">
-      <div class="etime">${esc(e.start)}${e.end ? "–" + esc(e.end) : ""}</div><div class="bar"></div>
+      <div class="etime">${esc(e.start)}${e.end ? "–" + esc(e.end) : ""}</div><div class="bar" style="background:${colorFor(e.cal)}"></div>
       <div><div class="etitle">${esc(e.title)}</div>
       ${sub ? `<div class="eloc">${esc(sub)}</div>` : ""}</div>
     </div>`;
@@ -346,9 +388,10 @@ function renderCalendar(el, feeds){
     b.classList.toggle("on", on);
     b.setAttribute("aria-pressed", String(on));
   });
-  const multi = feeds.length > 1;
+  const calFeeds = feeds.filter(f => f.cal !== false);
+  const multi = calFeeds.length > 1;
   const byDay = {};
-  feeds.forEach(f => (f.agenda || []).forEach(e => {
+  calFeeds.forEach(f => (f.agenda || []).forEach(e => {
     const dt = e.date || dstr(0); // old feeds without dates land on today
     (byDay[dt] = byDay[dt] || []).push(Object.assign({}, e, {_acct: f.label}));
   }));
@@ -359,9 +402,10 @@ function renderCalendar(el, feeds){
     return a.start < b.start ? -1 : 1;
   }));
 
-  if (view === "week"){ el.innerHTML = weekHtml(byDay); return; }
+  const legend = calLegend(byDay);
+  if (view === "week"){ el.innerHTML = legend + weekHtml(byDay); return; }
 
-  let html = "";
+  let html = legend;
   for (let i = 0; i < 7; i++){
     const dt = dstr(i);
     const evs = byDay[dt] || [];
@@ -374,6 +418,17 @@ function renderCalendar(el, feeds){
   el.innerHTML = html || `<div class="empty">Nothing scheduled this week.</div>`;
 }
 
+function calLegend(byDay){
+  const seen = [];
+  Object.keys(byDay).sort().forEach(dt => byDay[dt].forEach(e => {
+    if (e.cal && seen.indexOf(e.cal) < 0) seen.push(e.cal);
+  }));
+  if (seen.length < 2) return "";
+  return '<div class="callegend">' + seen.map(c =>
+    `<span><span class="cdot" style="background:${colorFor(c)}"></span>${esc(c)}</span>`
+  ).join("") + "</div>";
+}
+
 function weekHtml(byDay){
   let html = '<div class="weekgrid">';
   for (let i = 0; i < 7; i++){
@@ -384,7 +439,7 @@ function weekHtml(byDay){
       `<h4><span>${esc(d.toLocaleDateString(undefined, {weekday: "short"}))}</span>` +
       `<b>${d.getDate()}</b></h4>` +
       (evs.length ? evs.map(e =>
-        `<div class="evt${e.end ? "" : " allday"}">` +
+        `<div class="evt${e.end ? "" : " allday"}" style="border-color:${colorFor(e.cal)}">` +
         (e.end ? `<span class="t">${esc(e.start)}</span>` : `<span class="t">all day</span>`) +
         `<span>${esc(e.title)}</span></div>`
       ).join("") : `<div class="evt none">—</div>`) +
@@ -394,34 +449,49 @@ function weekHtml(byDay){
 }
 
 function renderTasks(el, feeds){
-  const multi = feeds.length > 1;
-  el.innerHTML = '<div class="tblocks' + (multi ? " cols2" : "") + '">' + feeds.map((f, i) =>
+  const taskFeeds = feeds.filter(f => f.tasks !== false);
+  const multi = taskFeeds.length > 1;
+  el.innerHTML = '<div class="tblocks' + (multi ? " cols2" : "") + '">' + taskFeeds.map((f, i) =>
     '<div class="tblock">' +
     (multi ? '<h3 class="accthead">' + esc(f.label || ("Account " + (i + 1))) + "</h3>" : "") +
-    '<div class="tscroll">' +
-      ((f.taskLists && f.taskLists.length)
-        ? f.taskLists.map(tlistHtml).join("")
-        : '<div class="empty">No open tasks.</div>') +
-    "</div></div>"
+    '<div class="tscroll">' + taskBlockHtml(f) + "</div></div>"
   ).join("") + "</div>";
 }
 
-function tlistHtml(l){
+/* One account block: list names as colored chips on top, then every task in a
+ * single list ordered by due date (overdue first), each in its list's color. */
+function taskBlockHtml(f){
+  const lists = f.taskLists || [];
+  const chips = lists.map(l => {
+    const c = colorFor(l.name);
+    return `<span class="lchip" style="border-color:${c};color:${c}">${esc(l.name)}</span>`;
+  }).join("");
+  const all = [];
+  lists.forEach(l => (l.tasks || []).forEach(t =>
+    all.push({t: t, list: l.name, color: colorFor(l.name),
+              listId: t.listId || "", id: t.id || ""})));
+  all.sort((a, b) => (dueRank(a.t.due) - dueRank(b.t.due)) ||
+                     (a.t.title < b.t.title ? -1 : 1));
+  const rows = all.length ? all.map(taskRow).join("")
+                          : '<div class="empty">No open tasks.</div>';
+  return (chips ? '<div class="listchips">' + chips + "</div>" : "") + rows;
+}
+
+function taskRow(item){
+  const t = item.t, c = item.color;
   const today = new Date(); today.setHours(0,0,0,0);
-  return `<div class="tlist"><h3>${esc(l.name)}</h3>` +
-    l.tasks.map(t => {
-      let dueLabel = "", dueCls = "";
-      if(t.due === "today"){ dueLabel = "today"; dueCls = "today"; }
-      else if(t.due === "overdue"){ dueLabel = "overdue"; dueCls = "overdue"; }
-      else if(t.due){
-        const d = new Date(t.due + "T12:00:00");
-        dueLabel = d.toLocaleDateString(undefined, {month:"short", day:"numeric"});
-        if(d < today){ dueCls = "overdue"; }
-      }
-      return `<div class="task"><div class="box"></div>
-        <div class="t">${esc(t.title)}</div>
-        ${dueLabel ? `<div class="due ${dueCls}">${esc(dueLabel)}</div>` : ""}</div>`;
-    }).join("") + `</div>`;
+  let dueLabel = "", dueCls = "";
+  if (t.due === "today"){ dueLabel = "today"; dueCls = "today"; }
+  else if (t.due === "overdue"){ dueLabel = "overdue"; dueCls = "overdue"; }
+  else if (t.due){
+    const d = new Date(t.due + "T12:00:00");
+    dueLabel = d.toLocaleDateString(undefined, {month: "short", day: "numeric"});
+    if (d < today){ dueCls = "overdue"; }
+  }
+  return `<div class="task" data-list="${esc(item.listId)}" data-id="${esc(item.id)}">` +
+    `<div class="box" style="border-color:${c}"></div>` +
+    `<div class="t" style="color:${c}">${esc(t.title)}</div>` +
+    (dueLabel ? `<div class="due ${dueCls}">${esc(dueLabel)}</div>` : "") + `</div>`;
 }
 
 function esc(s){ return String(s).replace(/[&<>"']/g, c =>
@@ -443,6 +513,8 @@ async function load(){
         label: (res.feed.label || (res.data && res.data.owner) || ("Account " + (i + 1))).trim(),
         agenda: res.data.agenda || [],
         taskLists: res.data.taskLists || [],
+        cal: res.feed.cal !== false,
+        tasks: res.feed.tasks !== false,
         idx: i
       };
     });
@@ -451,7 +523,8 @@ async function load(){
       const r = await fetch(LOCAL_URL, {cache:"no-store"});
       if(!r.ok) throw new Error("http " + r.status);
       const data = await r.json();
-      feeds = [{label: "", agenda: data.agenda || [], taskLists: data.taskLists || [], idx: 0}];
+      feeds = [{label: "", agenda: data.agenda || [], taskLists: data.taskLists || [],
+               cal: true, tasks: true, idx: 0}];
     }catch(e){ demo = true; }
   }
   if (demo) feeds = MOCK.feeds;
@@ -547,6 +620,8 @@ load(); setInterval(load, REFRESH_MS);
       box.querySelector('[data-f="label"]').value = f.label || "";
       box.querySelector('[data-f="url"]').value = f.url || "";
       box.querySelector('[data-f="key"]').value = f.key || "";
+      box.querySelector('[data-f="cal"]').checked = f.cal !== false;
+      box.querySelector('[data-f="tasks"]').checked = f.tasks !== false;
     });
   }
   document.getElementById("settingsBtn").addEventListener("click", function(){
@@ -566,7 +641,9 @@ load(); setInterval(load, REFRESH_MS);
       feeds.push({
         label: box.querySelector('[data-f="label"]').value.trim(),
         url: url,
-        key: box.querySelector('[data-f="key"]').value.trim()
+        key: box.querySelector('[data-f="key"]').value.trim(),
+        cal: box.querySelector('[data-f="cal"]').checked,
+        tasks: box.querySelector('[data-f="tasks"]').checked
       });
     });
     saveFeeds(feeds);
