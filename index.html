@@ -162,7 +162,9 @@
   .evt{border-left:3px solid transparent; padding-left:7px}
   .listchips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; flex:0 0 auto}
   .lchip{font-size:15px; padding:5px 13px; border-radius:20px;
-    border:1px solid; white-space:nowrap}
+    border:1px solid; white-space:nowrap; background:rgba(255,255,255,.03);
+    cursor:pointer; font:inherit; transition:opacity .2s}
+  .lchip.off{opacity:.32; filter:grayscale(1)}
 
   .task{transition:opacity .35s ease}
   .task.done{opacity:0}
@@ -484,27 +486,68 @@ function renderTasks(el, feeds){
   el.innerHTML = '<div class="tblocks' + (multi ? " cols2" : "") + '">' + taskFeeds.map((f, i) =>
     '<div class="tblock" data-feed="' + f.idx + '">' +
     (multi ? '<h3 class="accthead">' + esc(f.label || ("Account " + (i + 1))) + "</h3>" : "") +
-    '<div class="tscroll">' + taskBlockHtml(f) + "</div></div>"
+    taskChipsHtml(f) +
+    '<div class="tscroll">' + taskRowsHtml(f) + "</div></div>"
   ).join("") + "</div>";
 }
 
-/* One account block: list names as colored chips on top, then every task in a
- * single list ordered by due date (overdue first), each in its list's color. */
-function taskBlockHtml(f){
+/* Hidden-list filter: per feed, a set of list names whose tasks are hidden.
+ * Survives the 60s refresh and is persisted on the device. */
+let hiddenLists = {};
+function loadHidden(){
+  try{
+    const raw = JSON.parse(localStorage.getItem("tb-hidden") || "{}");
+    Object.keys(raw).forEach(k => { hiddenLists[k] = new Set(raw[k]); });
+  }catch(e){}
+}
+function saveHidden(){
+  try{
+    const o = {};
+    Object.keys(hiddenLists).forEach(k => { o[k] = Array.from(hiddenLists[k]); });
+    localStorage.setItem("tb-hidden", JSON.stringify(o));
+  }catch(e){}
+}
+function toggleList(feedIdx, listName){
+  feedIdx = parseInt(feedIdx, 10);
+  if (isNaN(feedIdx) || !listName) return;
+  if (!hiddenLists[feedIdx]) hiddenLists[feedIdx] = new Set();
+  const s = hiddenLists[feedIdx];
+  if (s.has(listName)) s.delete(listName); else s.add(listName);
+  saveHidden();
+  renderTasks(document.getElementById("tasks"), lastFeeds);
+}
+
+/* Chips sit above the scrolling task list; tapping one greys it out and
+ * hides that list's tasks (tap again to bring them back). */
+function taskChipsHtml(f){
   const lists = f.taskLists || [];
-  const chips = lists.map(l => {
+  if (!lists.length) return "";
+  const hidden = hiddenLists[f.idx] || new Set();
+  return '<div class="listchips">' + lists.map(l => {
     const c = colorFor(l.name);
-    return `<span class="lchip" style="border-color:${c};color:${c}">${esc(l.name)}</span>`;
-  }).join("");
+    const off = hidden.has(l.name);
+    return `<button type="button" class="lchip${off ? " off" : ""}" data-list="${esc(l.name)}"` +
+      ` style="border-color:${c};color:${c}">${esc(l.name)}</button>`;
+  }).join("") + "</div>";
+}
+
+/* Every visible task in a single list ordered by due date (overdue first),
+ * each in its list's color. */
+function taskRowsHtml(f){
+  const lists = f.taskLists || [];
+  const hidden = hiddenLists[f.idx] || new Set();
   const all = [];
-  lists.forEach(l => (l.tasks || []).forEach(t =>
-    all.push({t: t, list: l.name, color: colorFor(l.name),
-              listId: t.list || "", id: t.id || ""})));
+  lists.forEach(l => {
+    if (hidden.has(l.name)) return;
+    (l.tasks || []).forEach(t =>
+      all.push({t: t, list: l.name, color: colorFor(l.name),
+                listId: t.list || "", id: t.id || ""}));
+  });
   all.sort((a, b) => (dueRank(a.t.due) - dueRank(b.t.due)) ||
                      (a.t.title < b.t.title ? -1 : 1));
-  const rows = all.length ? all.map(taskRow).join("")
-                          : '<div class="empty">No open tasks.</div>';
-  return (chips ? '<div class="listchips">' + chips + "</div>" : "") + rows;
+  if (all.length) return all.map(taskRow).join("");
+  const allHidden = lists.length > 0 && lists.every(l => hidden.has(l.name));
+  return `<div class="empty">${allHidden ? "Lists hidden — tap a chip to show." : "No open tasks."}</div>`;
 }
 
 function taskRow(item){
@@ -612,6 +655,12 @@ function hintFooter(msg){
 }
 
 document.getElementById("tasks").addEventListener("click", function(e){
+  const chip = e.target && e.target.closest ? e.target.closest(".lchip") : null;
+  if (chip){
+    const block = chip.closest ? chip.closest(".tblock") : null;
+    if (block) toggleList(block.getAttribute("data-feed"), chip.getAttribute("data-list"));
+    return;
+  }
   const row = e.target && e.target.closest ? e.target.closest(".task") : null;
   if (!row || row.classList.contains("done")) return;
   const block = row.closest ? row.closest(".tblock") : null;
@@ -639,6 +688,7 @@ function tickClock(){
 
 tickClock(); setInterval(tickClock, 1000);
 applyCalSize(getCalSize());
+loadHidden();
 load(); setInterval(load, REFRESH_MS);
 
 /* ------------------------------------------------------------------
