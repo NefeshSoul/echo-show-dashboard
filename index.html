@@ -260,6 +260,11 @@
       <p class="hint" id="quickStatus" style="margin:12px 0 0" aria-live="polite"></p>
     </div>
     <div class="acct">
+      <h3>Echo Show mode</h3>
+      <label class="chk"><input type="checkbox" id="showMode"> Keep alive + fullscreen on tap</label>
+      <p class="hint" id="uaInfo" style="margin:10px 0 0"></p>
+    </div>
+    <div class="acct">
       <h3>Account 1</h3>
       <label>Label<input data-f="label" placeholder="e.g. TJ" autocomplete="off"></label>
       <label>Feed URL<input data-f="url" inputmode="url" placeholder="tinyurl code or full URL" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
@@ -305,6 +310,16 @@ const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
+const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
+
+/* Manual "this is an Echo Show" override, stored per device. */
+function getShowModeSetting(){
+  try{ return localStorage.getItem(LS_SHOWMODE) === "1"; }catch(e){ return false; }
+}
+/* True on an Echo Show: auto-detected Silk, or the manual override in ⚙. */
+function isShowMode(){
+  return IS_SILK || getShowModeSetting();
+}
 
 /* Device: Silk's UA contains "Silk/x.y" (Amazon documents the pattern), so the
  * page knows when it's on an Echo Show vs a regular browser. Small screens
@@ -757,7 +772,7 @@ load(); setInterval(load, REFRESH_MS);
  * hides browser chrome in browsers that honor it.
  * ------------------------------------------------------------------ */
 (function silkKeepAlive(){
-  if (!IS_SILK) return; /* silent-audio keep-alive only matters on the Echo Show; pointless on desktop */
+  if (!isShowMode()) return; /* keep-alive only matters on the Echo Show; pointless on desktop */
   function silentWavURL(seconds, rate){
     seconds = seconds || 2; rate = rate || 8000;
     var n = Math.floor(seconds * rate);
@@ -788,7 +803,7 @@ load(); setInterval(load, REFRESH_MS);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();
-  if (IS_SILK) document.addEventListener("pointerdown", function(){
+  if (isShowMode()) document.addEventListener("pointerdown", function(){
     try{
       var el = document.documentElement;
       if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen();
@@ -820,7 +835,17 @@ load(); setInterval(load, REFRESH_MS);
     fill();
     document.getElementById("calSize").value = getCalSize();
     applyCalSize(getCalSize());
+    document.getElementById("showMode").checked = getShowModeSetting();
+    document.getElementById("uaInfo").textContent =
+      (IS_SILK ? "This browser was detected as Amazon Silk. "
+               : "Not detected as Silk — if this is an Echo Show, turn on the toggle above. ") +
+      "UA: " + String(navigator.userAgent || "").slice(0, 100);
     overlay.hidden = false;
+  });
+  document.getElementById("showMode").addEventListener("change", function(e){
+    try{ localStorage.setItem(LS_SHOWMODE, e.target.checked ? "1" : "0"); }catch(err){}
+    document.getElementById("uaInfo").textContent =
+      "Saved — reload the page for Echo Show mode to take effect.";
   });
   document.getElementById("calSize").addEventListener("input", function(e){
     const v = Math.min(80, Math.max(20, parseInt(e.target.value, 10) || 50));
