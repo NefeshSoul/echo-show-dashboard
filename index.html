@@ -877,6 +877,38 @@ load(); setInterval(load, REFRESH_MS);
     load();
   });
 })();
+
+/* Setup via URL hash: opening the page as .../dashboard/#aqurn configures
+ * the feeds from aqurn.json automatically — but only on a fresh device with
+ * no feeds saved yet, so it never clobbers an existing setup. */
+(function hashSetup(){
+  var m = /^#([A-Za-z0-9]{3,32})$/.exec(location.hash || "");
+  if (!m) return;
+  if (getFeeds().length) return;
+  var code = m[1].toLowerCase();
+  try{
+    if (sessionStorage.getItem("tb-setup-tried") === code) return;
+    sessionStorage.setItem("tb-setup-tried", code);
+  }catch(e){}
+  fetch(code + ".json", {cache: "no-store"}).then(function(r){
+    if (!r.ok) throw new Error("not found");
+    return r.json();
+  }).then(function(data){
+    var feeds = ((data && data.feeds) || []).filter(function(f){ return f && f.url; }).slice(0, 2);
+    if (!feeds.length) throw new Error("empty");
+    saveFeeds(feeds.map(function(f){
+      return {
+        label: String(f.label || "").trim(),
+        url: normalizeFeedUrl(f.url),
+        key: String(f.key || "").trim(),
+        cal: f.cal !== false,
+        tasks: f.tasks !== false
+      };
+    }));
+    try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){}
+    load();
+  }).catch(function(){ /* leave the hash; settings panel remains the fallback */ });
+})();
 </script>
 </body>
 </html>
