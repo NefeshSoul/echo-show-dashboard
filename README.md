@@ -8,9 +8,10 @@ all Echo Show devices). Say **"Alexa, open task board"**.
 ## How it works
 
 1. `dashboard/index.html` — the actual dashboard. Dark wall-display theme,
-   big clock, today's agenda on the left, task lists on the right.
+   big clock, calendar section with an Agenda/Week toggle, and task lists in
+   side-by-side blocks — one per Google account.
    Data priority: feed URLs saved on the device via the ⚙ settings panel
-   (supports two Google accounts — items are merged and labeled)
+   (supports two Google accounts — items are merged and labeled by account)
    → `./data.json` → embedded demo data (with a visible DEMO DATA badge).
 2. `skill/` — a custom Alexa skill. On launch it sends
    `Alexa.Presentation.HTML.Start` with your dashboard URL, which loads the
@@ -74,6 +75,19 @@ Per account:
    your `/exec` URL; Account 2: label + the second account's `/exec` URL →
    Save. (Tip: shorten the exec URLs first — on the Show you only need to
    type the tinyurl code part, e.g. `25hv99qa`.)
+
+   Already deployed an earlier version of the script? Re-paste the updated
+   `Code.gs`, then Deploy → Manage deployments → edit the web app →
+   Version: **New version** → Deploy. (The 7-day calendar feed needs the
+   updated script; old deployments keep working but only show today.)
+
+Feed format (for reference): each feed returns JSONP with:
+- `agenda` — events for today + 6 days; each has `date` (`YYYY-MM-DD`),
+  `start`/`end` (`HH:MM`; all-day events use `start:"All day", end:""`),
+  `title`, `location`, `cal`
+- `taskLists` — `[{name, tasks: [{title, due}]}]`; `due` is `"today"`,
+  `"overdue"`, `""`, or `YYYY-MM-DD`
+- `owner` — account email, used as a fallback label
 
 URLs stay on the device and never land in this public repo.
 
