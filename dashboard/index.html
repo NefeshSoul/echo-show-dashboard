@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task Board</title>
+<style>
+  :root{
+    --bg:#0a0d13; --panel:#121724; --panel2:#0e1320;
+    --ink:#f2f5f9; --dim:#8b95a7; --faint:#5b6577;
+    --accent:#5aa9ff; --warn:#ff7a7a; --ok:#4cd97b; --line:#1d2536;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    padding:26px 52px 18px; border-bottom:1px solid var(--line);
+    flex:0 0 auto;
+  }
+  .clock{font-size:88px; font-weight:200; letter-spacing:3px; line-height:1}
+  .clock small{font-size:30px; font-weight:400; color:var(--dim); letter-spacing:1px}
+  .dateline{text-align:right}
+  .dateline .dow{font-size:34px; font-weight:600}
+  .dateline .date{font-size:22px; color:var(--dim); margin-top:4px}
+  main{
+    flex:1 1 auto; display:grid; grid-template-columns:1.15fr 1fr; gap:28px;
+    padding:26px 52px; min-height:0;
+  }
+  section{background:var(--panel); border:1px solid var(--line); border-radius:18px;
+    padding:26px 30px; overflow:hidden; display:flex; flex-direction:column; min-height:0}
+  section h2{font-size:20px; text-transform:uppercase; letter-spacing:3px; color:var(--dim);
+    margin-bottom:18px; flex:0 0 auto}
+  .scroll{overflow-y:auto; flex:1 1 auto; scrollbar-width:none}
+  .scroll::-webkit-scrollbar{display:none}
+
+  /* Agenda */
+  .event{display:flex; gap:18px; padding:15px 6px; border-bottom:1px solid var(--line); align-items:baseline}
+  .event:last-child{border-bottom:none}
+  .etime{flex:0 0 150px; font-size:22px; color:var(--dim); font-variant-numeric:tabular-nums}
+  .event .bar{flex:0 0 5px; align-self:stretch; border-radius:3px; background:#2a3550}
+  .event.now .bar{background:var(--accent)}
+  .event.now .etime{color:var(--accent); font-weight:700}
+  .event.past{opacity:.42}
+  .etitle{font-size:27px; font-weight:600}
+  .eloc{font-size:19px; color:var(--dim); margin-top:3px}
+  .empty{color:var(--faint); font-size:22px; padding:24px 6px}
+
+  /* Tasks */
+  .tlist{margin-bottom:22px}
+  .tlist h3{font-size:17px; text-transform:uppercase; letter-spacing:2px; color:var(--faint); margin-bottom:10px}
+  .task{display:flex; gap:16px; align-items:flex-start; padding:13px 6px; border-bottom:1px solid var(--line); font-size:25px}
+  .task:last-child{border-bottom:none}
+  .box{flex:0 0 26px; height:26px; border:2px solid var(--faint); border-radius:7px; margin-top:5px}
+  .task .t{flex:1 1 auto}
+  .due{flex:0 0 auto; font-size:19px; color:var(--dim); margin-top:6px; font-variant-numeric:tabular-nums}
+  .due.overdue{color:var(--warn); font-weight:700}
+  .due.today{color:var(--accent); font-weight:600}
+
+  footer{
+    flex:0 0 auto; display:flex; justify-content:space-between; align-items:center;
+    padding:12px 52px; border-top:1px solid var(--line);
+    font-size:16px; color:var(--faint); letter-spacing:1px;
+  }
+  .badge{font-size:14px; letter-spacing:2px; padding:5px 14px; border-radius:20px;
+    border:1px solid var(--warn); color:var(--warn); display:none}
+  body.demo .badge{display:inline-block}
+
+  @media (orientation:portrait){
+    main{grid-template-columns:1fr; grid-template-rows:1fr 1fr}
+    .clock{font-size:64px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="clock"><span id="time">--:--</span> <small id="ampm"></small></div>
+  <div class="dateline">
+    <div class="dow" id="dow">&nbsp;</div>
+    <div class="date" id="date">&nbsp;</div>
+  </div>
+</header>
+<main>
+  <section>
+    <h2>Today's Agenda</h2>
+    <div class="scroll" id="agenda"></div>
+  </section>
+  <section>
+    <h2>Tasks</h2>
+    <div class="scroll" id="tasks"></div>
+  </section>
+</main>
+<footer>
+  <span id="updated">loading…</span>
+  <span class="badge">DEMO DATA</span>
+</footer>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------
+ * DATA: the live feed URL lives ON THE DEVICE, not in this public repo.
+ * Open the page once as:
+ *   https://…/echo-show-dashboard/#https://script.google.com/…/exec
+ * The URL is saved to localStorage and scrubbed from the address bar.
+ * Without a configured feed it tries ./data.json, then demo data.
+ * (Apps Script doesn't send CORS headers, so the feed loads via JSONP.)
+ * ------------------------------------------------------------------ */
+const LOCAL_URL = "data.json";
+const REFRESH_MS = 60 * 1000;
+const LS_KEY = "tb-data-url";
+
+function getFeedUrl(){
+  try{
+    if (location.hash.length > 1){
+      localStorage.setItem(LS_KEY, decodeURIComponent(location.hash.slice(1)));
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+    return localStorage.getItem(LS_KEY);
+  }catch(e){ return null; }
+}
+
+function loadJsonp(url){
+  return new Promise(function(resolve, reject){
+    var cb = "tb_cb_" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
+    var s = document.createElement("script");
+    s.src = url + (url.indexOf("?") >= 0 ? "&" : "?") + "callback=" + cb;
+    var done = false;
+    var to = setTimeout(function(){ cleanup(); reject(new Error("timeout")); }, 20000);
+    function cleanup(){
+      if (done) return; done = true;
+      clearTimeout(to); delete window[cb]; s.remove();
+    }
+    window[cb] = function(data){ cleanup(); resolve(data); };
+    s.onerror = function(){ cleanup(); reject(new Error("load failed")); };
+    document.body.appendChild(s);
+  });
+}
+
+const MOCK = {
+  agenda: [
+    { start: "07:00", end: "07:45", title: "Morning run", location: "Papago Park" },
+    { start: "10:30", end: "11:30", title: "Grocery run", location: "Whole Foods" },
+    { start: "13:00", end: "14:00", title: "Call with accountant", location: "" },
+    { start: "18:30", end: "20:00", title: "Dinner with Sam", location: "FnB" }
+  ],
+  taskLists: [
+    { name: "Today", tasks: [
+      { title: "Review Q4 ad spend report", due: "today" },
+      { title: "Water the plants", due: "today" },
+      { title: "Book dentist appointment", due: "overdue" }
+    ]},
+    { name: "This week", tasks: [
+      { title: "Draft Nefesh launch notes", due: "2026-10-14" },
+      { title: "Rotate tires", due: "2026-10-16" }
+    ]}
+  ]
+};
+
+function toMin(hhmm){ const [h,m] = hhmm.split(":").map(Number); return h*60+m; }
+function nowMin(){ const d = new Date(); return d.getHours()*60 + d.getMinutes(); }
+
+function renderAgenda(el, agenda){
+  const now = nowMin();
+  if(!agenda.length){ el.innerHTML = '<div class="empty">Nothing scheduled today.</div>'; return; }
+  el.innerHTML = agenda.map(e => {
+    const allDay = !e.end;
+    const s = allDay ? -1 : toMin(e.start), en = allDay ? -1 : toMin(e.end);
+    const cls = !allDay && now >= s && now < en ? "now" : (!allDay && now >= en ? "past" : "");
+    const when = e.end ? `${e.start}–${e.end}` : e.start; // all-day: single label
+    const sub = [e.cal, e.location].filter(Boolean).join(" · ");
+    return `<div class="event ${cls}">
+      <div class="etime">${when}</div><div class="bar"></div>
+      <div><div class="etitle">${esc(e.title)}</div>
+      ${sub ? `<div class="eloc">${esc(sub)}</div>` : ""}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderTasks(el, lists){
+  const today = new Date(); today.setHours(0,0,0,0);
+  el.innerHTML = lists.map(l => `
+    <div class="tlist"><h3>${esc(l.name)}</h3>
+    ${l.tasks.map(t => {
+      let dueLabel = "", dueCls = "";
+      if(t.due === "today"){ dueLabel = "today"; dueCls = "today"; }
+      else if(t.due === "overdue"){ dueLabel = "overdue"; dueCls = "overdue"; }
+      else if(t.due){ 
+        const d = new Date(t.due + "T12:00:00");
+        dueLabel = d.toLocaleDateString(undefined, {month:"short", day:"numeric"});
+        if(d < today){ dueCls = "overdue"; }
+      }
+      return `<div class="task"><div class="box"></div>
+        <div class="t">${esc(t.title)}</div>
+        ${dueLabel ? `<div class="due ${dueCls}">${esc(dueLabel)}</div>` : ""}</div>`;
+    }).join("")}</div>`).join("");
+}
+
+function esc(s){ return String(s).replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+async function load(){
+  let data = null, demo = false;
+  const feed = getFeedUrl();
+  if (feed){
+    try{ data = await loadJsonp(feed); }
+    catch(e){ data = MOCK; demo = true; }
+  } else {
+    try{
+      const r = await fetch(LOCAL_URL, {cache:"no-store"});
+      if(!r.ok) throw new Error("http " + r.status);
+      data = await r.json();
+    }catch(e){ data = MOCK; demo = true; }
+  }
+  document.body.classList.toggle("demo", demo);
+  renderAgenda(document.getElementById("agenda"), data.agenda || []);
+  renderTasks(document.getElementById("tasks"), data.taskLists || []);
+  const stamp = "updated " + new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+  document.getElementById("updated").textContent = demo
+    ? (feed ? stamp + " · demo data (feed unreachable)"
+            : stamp + " · demo data — add your feed: open this page once with #YOUR_SCRIPT_URL appended")
+    : stamp;
+}
+
+function tickClock(){
+  const d = new Date();
+  let h = d.getHours(), ap = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  document.getElementById("time").textContent =
+    h + ":" + String(d.getMinutes()).padStart(2,"0");
+  document.getElementById("ampm").textContent = ap;
+  document.getElementById("dow").textContent =
+    d.toLocaleDateString(undefined, {weekday:"long"});
+  document.getElementById("date").textContent =
+    d.toLocaleDateString(undefined, {month:"long", day:"numeric", year:"numeric"});
+}
+
+tickClock(); setInterval(tickClock, 1000);
+load(); setInterval(load, REFRESH_MS);
+
+/* ------------------------------------------------------------------
+ * Silk keep-alive (Echo Show): Silk returns to the home screen after a
+ * few idle minutes. A muted, looping silent audio track counts as media
+ * playback and keeps the page alive. Fully silent.
+ * Also requests fullscreen on first tap (needs a user gesture), which
+ * hides browser chrome in browsers that honor it.
+ * ------------------------------------------------------------------ */
+(function silkKeepAlive(){
+  function silentWavURL(seconds, rate){
+    seconds = seconds || 2; rate = rate || 8000;
+    var n = Math.floor(seconds * rate);
+    var buf = new ArrayBuffer(44 + n);
+    var v = new DataView(buf);
+    function str(o, s){ for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+    str(0, "RIFF"); v.setUint32(4, 36 + n, true); str(8, "WAVE");
+    str(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+    v.setUint16(22, 1, true); v.setUint32(24, rate, true);
+    v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+    str(36, "data"); v.setUint32(40, n, true);
+    for (var i = 0; i < n; i++) v.setUint8(44 + i, 128); /* 8-bit silence */
+    return URL.createObjectURL(new Blob([buf], {type: "audio/wav"}));
+  }
+  function start(){
+    try{
+      var a = document.createElement("audio");
+      a.muted = true; a.loop = true; a.autoplay = true;
+      a.setAttribute("playsinline", "");
+      a.src = silentWavURL();
+      a.style.display = "none";
+      document.body.appendChild(a);
+      var p = a.play();
+      if (p && p.catch) p.catch(function(){
+        document.addEventListener("pointerdown", function(){ a.play(); }, {once: true});
+      });
+    }catch(e){ /* keep-alive is best-effort */ }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
+  document.addEventListener("pointerdown", function(){
+    try{
+      var el = document.documentElement;
+      if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen();
+    }catch(e){}
+  });
+})();
+</script>
+</body>
+</html>
