@@ -20,18 +20,36 @@
  *     Google account and add its URL as Account 2. URLs stay on the
  *     device and never land in the public repo.
  *
+ * TAP-TO-COMPLETE (optional): lets the dashboard mark tasks done.
+ *  6. Project Settings (gear) → Script properties → add property
+ *       TASKBOARD_SECRET = <a long random string you make up>
+ *  7. Re-paste this file, then in the editor select doGet → Run, to
+ *     re-authorize (task completion needs write access — click through
+ *     the "unverified app" warnings again as in step 4).
+ *  8. Deploy → Manage deployments → edit the web app →
+ *     Version: New version → Deploy (URL stays the same).
+ *  9. On the Show: ⚙ → enter the same secret in the account's
+ *     "Secret key" field → Save. Now tapping a task completes it.
+ *
  * PRIVACY: "Anyone" means anyone with the link can read the JSON. The link
  * is long and unguessable, and it lives only in your bookmark/on the
- * device — but it is obscurity, not authentication.
+ * device — but it is obscurity, not authentication. The secret key guards
+ * the *write* endpoint; reads stay link-obscured as before.
  */
 
 function doGet(e) {
-  var callback = (e && e.parameter && e.parameter.callback) || null;
+  var params = (e && e.parameter) || {};
+  if (params.action === "complete") return doComplete(params);
   var payload = {
     agenda: getAgenda(),
     taskLists: getTaskLists(),
-    owner: getOwner()
+    owner: getOwner(),
+    execUrl: ScriptApp.getService().getUrl()
   };
+  return respond(payload, params.callback);
+}
+
+function respond(payload, callback) {
   var json = JSON.stringify(payload);
   if (callback) {
     // JSONP — Apps Script web apps don't send CORS headers.
@@ -42,6 +60,26 @@ function doGet(e) {
   return ContentService
     .createTextOutput(json)
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Marks one task completed. Guarded by the TASKBOARD_SECRET script property —
+ * the dashboard sends it as ?key=... and stores it only on the device.
+ */
+function doComplete(params) {
+  var secret = PropertiesService.getScriptProperties().getProperty("TASKBOARD_SECRET") || "";
+  if (!secret || params.key !== secret) {
+    return respond({ok: false, error: "bad key"}, params.callback);
+  }
+  if (!params.listId || !params.taskId) {
+    return respond({ok: false, error: "missing id"}, params.callback);
+  }
+  try {
+    Tasks.Tasks.patch({status: "completed"}, params.listId, params.taskId);
+    return respond({ok: true}, params.callback);
+  } catch (err) {
+    return respond({ok: false, error: String(err)}, params.callback);
+  }
 }
 
 function getAgenda() {
