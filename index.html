@@ -174,6 +174,42 @@
   .srow .lab b{color:var(--ink)}
   input[type=range]{width:100%; accent-color:var(--accent); height:38px; cursor:pointer}
 
+  /* Compact mode: small displays (Echo Show 5 = 960x480). Everything scales
+     down; layout and features are unchanged. */
+  body.compact header{padding:14px 20px 2px}
+  body.compact .clock{font-size:40px}
+  body.compact .dateline{font-size:16px}
+  body.compact main{gap:14px; padding:12px 18px}
+  body.compact section{padding:14px 16px; border-radius:12px}
+  body.compact section h2{font-size:13px; letter-spacing:2px; margin-bottom:10px}
+  body.compact .sechead{margin-bottom:10px}
+  body.compact .seg button{font-size:12px; padding:6px 10px}
+  body.compact .event{padding:10px 12px; gap:10px; border-radius:10px}
+  body.compact .etime{font-size:15px; min-width:84px}
+  body.compact .etitle{font-size:16px}
+  body.compact .eloc{font-size:12px}
+  body.compact .dayhead{font-size:12px; margin:12px 0 2px; letter-spacing:1px}
+  body.compact .task{font-size:15px; padding:9px 10px; gap:10px; border-radius:10px}
+  body.compact .box{width:20px; height:20px; border-width:3px; border-radius:6px}
+  body.compact .due{font-size:11px; padding:3px 8px}
+  body.compact .tlist h3{font-size:13px; margin:12px 0 6px}
+  body.compact .lchip{font-size:11px; padding:3px 9px}
+  body.compact .listchips{gap:6px; margin-bottom:8px}
+  body.compact .accthead{font-size:14px; margin-bottom:8px}
+  body.compact .tblocks{gap:14px}
+  body.compact .callegend{font-size:11px; gap:4px 10px; margin-bottom:8px}
+  body.compact .weekgrid{gap:6px}
+  body.compact .weekgrid .day{padding:6px; border-radius:8px}
+  body.compact .weekgrid .day h4 span{font-size:10px}
+  body.compact .weekgrid .day h4 b{font-size:14px}
+  body.compact .evt{font-size:11px; margin-top:6px}
+  body.compact .evt .t{font-size:10px}
+  body.compact .empty{font-size:14px; padding:16px 0}
+  body.compact footer{font-size:12px; padding:8px 18px 10px}
+  body.compact #settingsBtn{width:44px; height:44px; font-size:22px; top:12px; right:12px}
+  body.compact .demo-badge{font-size:12px; padding:6px 12px; top:12px; left:12px}
+  body.compact .panel{padding:22px}
+
   @media (orientation:portrait){
     main{grid-template-columns:1fr; grid-template-rows:var(--calpct,50%) 1fr}
     .clock{font-size:64px}
@@ -259,6 +295,14 @@ const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
+
+/* Device: Silk's UA contains "Silk/x.y" (Amazon documents the pattern), so the
+ * page knows when it's on an Echo Show vs a regular browser. Small screens
+ * (e.g. Echo Show 5 at 960x480) get a compact layout; the Show 15 (1920x1080)
+ * gets the full one. */
+const IS_SILK = /silk/i.test(navigator.userAgent || "");
+if (Math.min(window.screen.width, window.screen.height) < 700)
+  document.body.classList.add("compact");
 
 function getFeeds(){
   try{
@@ -729,7 +773,7 @@ load(); setInterval(load, REFRESH_MS);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();
-  document.addEventListener("pointerdown", function(){
+  if (IS_SILK) document.addEventListener("pointerdown", function(){
     try{
       var el = document.documentElement;
       if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen();
