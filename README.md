@@ -17,6 +17,9 @@ all Echo Show devices). Say **"Alexa, open task board"**.
    Calendar events are color-coded by calendar (Google's palette, with a
    legend); tasks are flattened across lists, sorted by due date (overdue
    first), each in its list's color with the list names as chips on top.
+   Detects Silk via the user-agent (fullscreen-on-first-touch only applies
+   there) and switches to a compact layout on small screens like the
+   Echo Show 5 (960×480).
 2. `skill/` — a custom Alexa skill. On launch it sends
    `Alexa.Presentation.HTML.Start` with your dashboard URL, which loads the
    page full-screen. The skill session stays open while the page is up.
