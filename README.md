@@ -9,8 +9,9 @@ all Echo Show devices). Say **"Alexa, open task board"**.
 
 1. `dashboard/index.html` — the actual dashboard. Dark wall-display theme,
    big clock, today's agenda on the left, task lists on the right.
-   Data priority: a feed URL saved on the device (see below) → `./data.json`
-   → embedded demo data (with a visible DEMO DATA badge).
+   Data priority: feed URLs saved on the device via the ⚙ settings panel
+   (supports two Google accounts — items are merged and labeled)
+   → `./data.json` → embedded demo data (with a visible DEMO DATA badge).
 2. `skill/` — a custom Alexa skill. On launch it sends
    `Alexa.Presentation.HTML.Start` with your dashboard URL, which loads the
    page full-screen. The skill session stays open while the page is up.
@@ -57,18 +58,22 @@ own Lambda.
 ### 3. Live data — pick a backend
 
 **Recommended: Apps Script web app** (`apps-script/Code.gs`) — no server,
-no Google Cloud project, ~5 minutes:
+no Google Cloud project, ~5 minutes **per Google account**. Google Tasks
+can't be shared between accounts, so for two accounts (e.g. you + your
+wife) each person deploys their own copy — the dashboard merges both feeds
+and labels whose items are whose.
 
+Per account:
 1. **script.google.com** → New project → paste in `apps-script/Code.gs`.
 2. Project Settings (gear) → Time zone → **(GMT-07:00) Phoenix**.
 3. Extensions → Advanced Google services → turn ON **Tasks API**.
 4. Deploy → New deployment → type **Web app** → *Execute as:* Me →
    *Who has access:* **Anyone** → Deploy → authorize → copy the `/exec` URL.
-5. On the Echo Show, open the dashboard **once** as
-   `https://nefeshsoul.github.io/echo-show-dashboard/#<your /exec URL>`
-   (tip: shorten the exec URL first — less typing on the Show).
-   The page saves the URL on the device and scrubs it from the address bar,
-   so it never lands in this public repo.
+5. On the Echo Show, tap the **⚙** button → Account 1: label (e.g. `TJ`) +
+   your `/exec` URL; Account 2: label + the second account's `/exec` URL →
+   Save. (Tip: shorten the exec URLs first — less typing on the Show.)
+
+URLs stay on the device and never land in this public repo.
 
 The page polls the feed every 60 s. Privacy note: "Anyone" access means the
 JSON is readable by anyone holding the link — the link is long, unguessable,
