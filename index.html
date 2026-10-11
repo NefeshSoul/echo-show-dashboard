@@ -619,9 +619,11 @@ let lastFeeds = [];
 async function load(){
   let feeds = [], demo = false;
   const cfg = getFeeds();
+  const failedFeeds = [];
   if (cfg.length){
-    const settled = await Promise.all(cfg.map(f =>
-      loadJsonp(f.url).then(d => ({feed: f, data: d})).catch(() => null)
+    const settled = await Promise.all(cfg.map((f, i) =>
+      loadJsonp(f.url).then(d => ({feed: f, data: d}))
+        .catch(() => { failedFeeds.push(f.label || ("Account " + (i + 1))); return null; })
     ));
     const ok = settled.filter(Boolean);
     if (!ok.length){ demo = true; }
@@ -650,10 +652,12 @@ async function load(){
   document.body.classList.toggle("demo", demo);
   renderAll();
   const stamp = "updated " + new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+  const failedMsg = failedFeeds.length
+    ? " \u00b7 \u26a0 unreachable: " + failedFeeds.join(", ") : "";
   document.getElementById("updated").textContent = demo
     ? (cfg.length ? stamp + " \u00b7 demo data (feeds unreachable)"
                   : stamp + " \u00b7 demo data \u2014 tap \u2699 to add your feeds")
-    : stamp;
+    : stamp + failedMsg;
 }
 
 function renderAll(){
