@@ -800,9 +800,14 @@ load(); setInterval(load, REFRESH_MS);
  * stored on the device in localStorage. */
 (function settings(){
   var overlay = document.getElementById("settingsOverlay");
+  function acctBoxes(){ /* the Quick setup box shares .acct styling but has no feed fields */
+    return Array.prototype.filter.call(document.querySelectorAll(".acct"), function(box){
+      return !!box.querySelector('[data-f="label"]');
+    });
+  }
   function fill(){
     var feeds = getFeeds();
-    document.querySelectorAll(".acct").forEach(function(box, i){
+    acctBoxes().forEach(function(box, i){
       var f = feeds[i] || {};
       box.querySelector('[data-f="label"]').value = f.label || "";
       box.querySelector('[data-f="url"]').value = f.url || "";
@@ -831,41 +836,32 @@ load(); setInterval(load, REFRESH_MS);
   /* Quick setup: fetch <code>.json from this site, fill the form, save. */
   document.getElementById("quickLoad").addEventListener("click", function(){
     var status = document.getElementById("quickStatus");
-    var code = document.getElementById("quickCode").value.replace(/[^A-Za-z0-9]/g, "").slice(0, 32);
+    var code = document.getElementById("quickCode").value.replace(/[^A-Za-z0-9]/g, "").slice(0, 32).toLowerCase();
     if (code.length < 3){ status.textContent = "Enter your setup code."; return; }
     status.textContent = "Loading…";
-    var variants = [code];
-    var lo = code.toLowerCase(), hi = code.toUpperCase();
-    if (lo !== code) variants.push(lo);
-    if (hi !== code && hi !== lo) variants.push(hi);
-    (function tryLoad(){
-      var c = variants.shift();
-      if (!c){ status.textContent = "Code not found — check it and try again."; return; }
-      fetch(c + ".json", {cache: "no-store"}).then(function(r){
-        if (!r.ok) throw new Error("not found");
-        return r.json();
-      }).then(function(data){
-        var feeds = ((data && data.feeds) || []).filter(function(f){ return f && f.url; }).slice(0, 2);
-        if (!feeds.length) throw new Error("empty");
-        var boxes = Array.prototype.filter.call(document.querySelectorAll(".acct"), function(box){
-          return !!box.querySelector('[data-f="label"]');
-        });
-        boxes.forEach(function(box, i){
-          var f = feeds[i] || {};
-          box.querySelector('[data-f="label"]').value = f.label || "";
-          box.querySelector('[data-f="url"]').value = f.url || "";
-          box.querySelector('[data-f="key"]').value = f.key || "";
-          box.querySelector('[data-f="cal"]').checked = f.cal !== false;
-          box.querySelector('[data-f="tasks"]').checked = f.tasks !== false;
-        });
-        status.textContent = "Loaded — saving…";
-        document.getElementById("saveSettings").click();
-      }).catch(tryLoad);
-    })();
+    fetch(code + ".json", {cache: "no-store"}).then(function(r){
+      if (!r.ok) throw new Error("not found");
+      return r.json();
+    }).then(function(data){
+      var feeds = ((data && data.feeds) || []).filter(function(f){ return f && f.url; }).slice(0, 2);
+      if (!feeds.length) throw new Error("empty");
+      acctBoxes().forEach(function(box, i){
+        var f = feeds[i] || {};
+        box.querySelector('[data-f="label"]').value = f.label || "";
+        box.querySelector('[data-f="url"]').value = f.url || "";
+        box.querySelector('[data-f="key"]').value = f.key || "";
+        box.querySelector('[data-f="cal"]').checked = f.cal !== false;
+        box.querySelector('[data-f="tasks"]').checked = f.tasks !== false;
+      });
+      status.textContent = "Loaded — saving…";
+      document.getElementById("saveSettings").click();
+    }).catch(function(){
+      status.textContent = "Code not found — check it and try again.";
+    });
   });
   document.getElementById("saveSettings").addEventListener("click", function(){
     var feeds = [];
-    document.querySelectorAll(".acct").forEach(function(box){
+    acctBoxes().forEach(function(box){
       var url = normalizeFeedUrl(box.querySelector('[data-f="url"]').value);
       if (!url) return;
       feeds.push({
