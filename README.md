@@ -85,6 +85,21 @@ Per account:
    Version: **New version** → Deploy. (The 7-day calendar feed needs the
    updated script; old deployments keep working but only show today.)
 
+**Tap-to-complete** (optional): tapping a task on the board marks it done
+in Google Tasks. Per account:
+1. In the script project: Project Settings (gear) → Script properties →
+   add `TASKBOARD_SECRET` = a long random string you make up (same string
+   can be reused for both accounts).
+2. Re-paste the updated `Code.gs`, then in the editor select `doGet` →
+   Run to re-authorize (completion needs the Tasks write scope — click
+   through the "unverified app" warnings again).
+3. Deploy → Manage deployments → edit → Version: **New version** → Deploy.
+4. On the Show: ⚙ → enter the same secret in the account's **Secret key**
+   field → Save. Now tapping a task fades it out and completes it.
+
+**Layout:** ⚙ → **Calendar size** slider (20–80%, default 50%) controls how
+much of the screen the calendar section gets, in both orientations.
+
 Feed format (for reference): each feed returns JSONP with:
 - `agenda` — events for today + 6 days; each has `date` (`YYYY-MM-DD`),
   `start`/`end` (`HH:MM`; all-day events use `start:"All day", end:""`),
