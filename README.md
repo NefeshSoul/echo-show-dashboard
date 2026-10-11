@@ -39,6 +39,28 @@ the Echo Show can reach. Pick one:
 
 Note the final URL, e.g. `https://you.github.io/task-board/`.
 
+### 1b. Quick setup (optional)
+
+Typing two feed URLs plus secret keys on the Show's touchscreen is painful.
+Instead, put a `<code>.json` file next to `index.html`:
+
+```json
+{"v": 1, "feeds": [
+  {"label": "TJ", "url": "https://script.google.com/macros/s/…/exec",
+   "key": "your-secret", "cal": true, "tasks": true},
+  {"label": "Kelley", "url": "https://script.google.com/macros/s/…/exec",
+   "key": "your-secret", "cal": false, "tasks": true}
+]}
+```
+
+Then on the device open ⚙ → **Quick setup**, type the code (5 characters,
+case-insensitive), and tap **Load from code** — both accounts, keys, and the
+Calendar/Tasks toggles fill in and save automatically.
+
+⚠ Anyone who can read the repo can read that file, so treat the URLs and keys
+in it as public. The tap-to-complete secret in the file must match the
+`TASKBOARD_SECRET` script property in each Apps Script project.
+
 ### 2. Create the skill
 
 Easiest path — Alexa developer console (developer.amazon.com/alexa):
