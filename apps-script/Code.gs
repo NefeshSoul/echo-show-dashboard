@@ -45,9 +45,10 @@ function doGet(e) {
 }
 
 function getAgenda() {
+  // Whole-week window: today + 6 days. Each event carries date:"YYYY-MM-DD".
   var now = new Date();
   var start = new Date(now); start.setHours(0, 0, 0, 0);
-  var end = new Date(now); end.setHours(23, 59, 59, 999);
+  var end = new Date(now); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999);
 
   var out = [];
   CalendarApp.getAllCalendars().forEach(function (cal) {
@@ -55,6 +56,7 @@ function getAgenda() {
       if (ev.getMyStatus() === CalendarApp.GuestStatus.NO) return; // declined
       var allDay = ev.isAllDayEvent();
       out.push({
+        date: fmtDate(ev.getStartTime()),
         start: allDay ? "All day" : fmtTime(ev.getStartTime()),
         end: allDay ? "" : fmtTime(ev.getEndTime()),
         title: ev.getTitle(),
@@ -96,6 +98,10 @@ function getOwner() {
 
 function fmtTime(d) {
   return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+}
+
+function fmtDate(d) {
+  return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
 }
 
 function normDue(iso) {
