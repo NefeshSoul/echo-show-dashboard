@@ -57,6 +57,10 @@ Then on the device open ⚙ → **Quick setup**, type the code (5 characters,
 case-insensitive), and tap **Load from code** — both accounts, keys, and the
 Calendar/Tasks toggles fill in and save automatically.
 
+Even quicker: open the dashboard as `https://you.github.io/task-board/#aqurn`.
+On a device with no feeds configured yet, the code in the URL is applied
+automatically on first load (it never overwrites an existing setup).
+
 ⚠ Anyone who can read the repo can read that file, so treat the URLs and keys
 in it as public. The tap-to-complete secret in the file must match the
 `TASKBOARD_SECRET` script property in each Apps Script project.
