@@ -61,9 +61,45 @@ Even quicker: open the dashboard as `https://you.github.io/task-board/#aqurn`.
 On a device with no feeds configured yet, the code in the URL is applied
 automatically on first load (it never overwrites an existing setup).
 
-⚠ Anyone who can read the repo can read that file, so treat the URLs and keys
-in it as public. The tap-to-complete secret in the file must match the
-`TASKBOARD_SECRET` script property in each Apps Script project.
+⚠ Anyone who can read the repo can read that file, so it holds feed URLs
+(read-only) only — never secrets. Secrets are delivered per-device via the
+broker (below).
+
+### 1c. Home Assistant climate (optional)
+
+The dashboard has a Climate tab that reads and controls a thermostat via
+the Home Assistant REST API. The HA long-lived token is never typed on a
+device and never committed to the repo — it is delivered once per device
+through a short pairing code brokered by the Apps Script:
+
+**Home Assistant side (one time):**
+1. HA must be reachable over HTTPS (Nabu Casa, DuckDNS + Let's Encrypt,
+   Cloudflare tunnel…), since the HTTPS dashboard page can't call plain-HTTP APIs.
+2. Allow the dashboard origin in `configuration.yaml`, then restart:
+   ```yaml
+   http:
+     cors_allowed_origins:
+       - https://nefeshsoul.github.io
+   ```
+3. Create a long-lived access token (your profile → Long-lived access tokens).
+   Prefer minting it as a dedicated limited user.
+
+**Apps Script side (one time):** this repo's `apps-script/Code.gs` includes
+`?action=storeToken` / `?action=fetchToken` endpoints. Deploy the current
+file as a New version, and set the `TASKBOARD_SECRET` script property to a
+fresh random value (it guards the write endpoints — keep it out of the repo).
+
+**Pair a device:**
+1. On your computer, open (all copy-paste, no typing on the device):
+   `https://script.google.com/macros/s/<ACCOUNT1_EXEC>/exec?action=storeToken&code=<4-8 CHARS OF YOUR CHOICE>&key=<TASKBOARD_SECRET>&haToken=<paste>&haUrl=https://your-ha:8123`
+   → responds `{"ok":true,"code":"…"}`.
+2. On the device: ⚙ → Home Assistant → type the code → Connect.
+   The page fetches the token + write key, saves them to that device's
+   localStorage, and the broker burns the code (single use). The thermostat
+   entity is auto-discovered (first `climate.*` entity).
+
+The Climate tab then shows current temp, setpoint steppers, and mode buttons,
+refreshing every 60 seconds while visible.
 
 ### 2. Create the skill
 
