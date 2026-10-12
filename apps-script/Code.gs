@@ -40,6 +40,8 @@
 function doGet(e) {
   var params = (e && e.parameter) || {};
   if (params.action === "complete") return doComplete(params);
+  if (params.action === "storeToken") return doStoreToken(params);
+  if (params.action === "fetchToken") return doFetchToken(params);
   var payload = {
     agenda: getAgenda(),
     taskLists: getTaskLists(),
@@ -80,6 +82,47 @@ function doComplete(params) {
   } catch (err) {
     return respond({ok: false, error: String(err)}, params.callback);
   }
+}
+
+/**
+ * One-time secret broker. Lets a device receive secrets (the write key, a
+ * Home Assistant token, ...) by typing a short code — nothing long is ever
+ * typed on the device or committed to the repo.
+ *
+ *  STORE (from your computer, once per secret bundle):
+ *    ?action=storeToken&code=AB12&key=<TASKBOARD_SECRET>
+ *      &haToken=<token>&haUrl=https://host:8123
+ *  Guarded by TASKBOARD_SECRET. Stores the bundle under PAIR_<CODE>.
+ *
+ *  FETCH (from the device):
+ *    ?action=fetchToken&code=AB12&callback=cb
+ *  Returns {writeKey, haToken, haUrl} ONCE, then deletes it. No key needed —
+ *  the short code is the credential and it self-destructs on use.
+ */
+function doStoreToken(params) {
+  var secret = PropertiesService.getScriptProperties().getProperty("TASKBOARD_SECRET") || "";
+  if (!secret || params.key !== secret) {
+    return respond({ok: false, error: "bad key"}, params.callback);
+  }
+  var code = String(params.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+  if (code.length < 4) return respond({ok: false, error: "bad code"}, params.callback);
+  var bundle = {
+    writeKey: secret,
+    haToken: String(params.haToken || ""),
+    haUrl: String(params.haUrl || "").replace(/\/+$/, "")
+  };
+  if (!bundle.haToken) return respond({ok: false, error: "missing token"}, params.callback);
+  PropertiesService.getScriptProperties().setProperty("PAIR_" + code, JSON.stringify(bundle));
+  return respond({ok: true, code: code}, params.callback);
+}
+
+function doFetchToken(params) {
+  var code = String(params.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty("PAIR_" + code);
+  if (!raw) return respond({ok: false, error: "not found"}, params.callback);
+  props.deleteProperty("PAIR_" + code); // single use
+  return respond({ok: true, bundle: JSON.parse(raw)}, params.callback);
 }
 
 function getAgenda() {
