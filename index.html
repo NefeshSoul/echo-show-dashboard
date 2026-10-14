@@ -322,7 +322,8 @@
     <div class="acct">
       <h3>Home Assistant</h3>
       <p class="hint" id="haStatus" style="margin:0 0 12px">Not connected.</p>
-      <label>Pairing code<input id="haCode" placeholder="4-character code" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="8"></label>
+      <label>HA pairing code<input id="haCode" placeholder="8-character code" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="8"></label>
+      <p class="hint" style="margin-top:8px">The code from the broker — not the 5-char Quick setup feed code above.</p>
       <div class="row">
         <button id="haConnect" type="button">Connect</button>
         <button id="haDisconnect" type="button" class="ghost">Disconnect</button>
