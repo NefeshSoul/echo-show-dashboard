@@ -76,30 +76,34 @@
     min-height:0; min-width:0;
   }
   #boardView[hidden]{display:none}
-  #climateView{flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center}
+  #climateView{flex:1 1 auto; min-height:0; overflow-y:auto; padding:18px 6px}
   #climateView[hidden]{display:none}
+  .clim-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+    gap:18px; max-width:1560px; margin:0 auto; width:100%}
   .climcard{
-    background:var(--panel); border:1px solid var(--line); border-radius:24px;
-    padding:44px 64px; text-align:center; min-width:min(560px,82vw);
+    background:var(--panel); border:1px solid var(--line); border-radius:20px;
+    padding:26px 24px; text-align:center;
   }
-  .clim-top{display:flex; align-items:center; justify-content:center; gap:36px}
-  .clim-cur{font-size:120px; font-weight:200; line-height:1}
-  .clim-cur small{font-size:44px; color:var(--dim); font-weight:400}
+  .clim-name{font-size:19px; font-weight:600; letter-spacing:2px; text-transform:uppercase;
+    color:var(--dim); margin-bottom:12px}
+  .clim-top{display:flex; align-items:center; justify-content:center; gap:22px}
+  .clim-cur{font-size:84px; font-weight:200; line-height:1}
+  .clim-cur small{font-size:30px; color:var(--dim); font-weight:400}
   .clim-meta{text-align:left}
-  .clim-state{font-size:34px; font-weight:600; text-transform:capitalize}
-  .clim-hum{font-size:22px; color:var(--dim); margin-top:6px}
-  .clim-setrow{display:flex; align-items:center; justify-content:center; gap:28px; margin:26px 0 6px}
+  .clim-state{font-size:22px; font-weight:600; text-transform:capitalize}
+  .clim-hum{font-size:16px; color:var(--dim); margin-top:4px}
+  .clim-setrow{display:flex; align-items:center; justify-content:center; gap:18px; margin:18px 0 4px}
   .clim-setrow button{
-    width:84px; height:84px; border-radius:50%; border:1px solid var(--line);
-    background:#0a0e16; color:var(--ink); font-size:44px; line-height:1; cursor:pointer;
+    width:62px; height:62px; border-radius:50%; border:1px solid var(--line);
+    background:#0a0e16; color:var(--ink); font-size:32px; line-height:1; cursor:pointer;
   }
   .clim-setrow button:active{background:#26314a}
-  .clim-set{font-size:64px; font-weight:300; min-width:190px}
-  .clim-set small{display:block; font-size:18px; color:var(--dim); font-weight:400}
-  #climModes{justify-content:center; margin-top:18px}
-  #climModes button{font-size:20px; padding:12px 22px; text-transform:capitalize}
-  .clim-err{color:#ff7a7a; font-size:18px; margin-top:14px; min-height:26px}
-  .clim-hint{color:var(--faint); font-size:16px; margin-top:6px}
+  .clim-set{font-size:46px; font-weight:300; min-width:120px}
+  .clim-set small{display:block; font-size:14px; color:var(--dim); font-weight:400}
+  .clim-modes{justify-content:center; margin-top:14px; flex-wrap:wrap}
+  .clim-modes button{font-size:15px; padding:8px 14px; text-transform:capitalize}
+  .clim-err{color:#ff7a7a; font-size:18px; margin-top:14px; min-height:26px; text-align:center}
+  .clim-hint{color:var(--faint); font-size:16px; margin-top:6px; text-align:center}
   section{background:var(--panel); border:1px solid var(--line); border-radius:18px;
     padding:26px 30px; overflow:hidden; display:flex; flex-direction:column; min-height:0}
   section h2{font-size:20px; text-transform:uppercase; letter-spacing:3px; color:var(--dim);
@@ -210,12 +214,15 @@
   body.compact .dateline{font-size:16px}
   body.compact main{padding:12px 18px}
   body.compact #boardView{gap:14px}
-  body.compact .climcard{padding:24px 30px}
-  body.compact .clim-cur{font-size:76px}
-  body.compact .clim-cur small{font-size:30px}
-  body.compact .clim-state{font-size:24px}
-  body.compact .clim-setrow button{width:62px; height:62px; font-size:34px}
-  body.compact .clim-set{font-size:46px; min-width:130px}
+  body.compact .climcard{padding:18px 16px; border-radius:14px}
+  body.compact .clim-name{font-size:15px; margin-bottom:8px}
+  body.compact .clim-cur{font-size:64px}
+  body.compact .clim-cur small{font-size:24px}
+  body.compact .clim-state{font-size:18px}
+  body.compact .clim-hum{font-size:13px}
+  body.compact .clim-setrow{gap:12px; margin:12px 0 2px}
+  body.compact .clim-setrow button{width:52px; height:52px; font-size:28px}
+  body.compact .clim-set{font-size:38px; min-width:100px}
   body.compact #viewTabs button{font-size:13px; padding:7px 12px}
   body.compact section{padding:14px 16px; border-radius:12px}
   body.compact section h2{font-size:13px; letter-spacing:2px; margin-bottom:10px}
@@ -284,23 +291,9 @@
   </section>
   </div>
   <div id="climateView" hidden>
-    <div class="climcard">
-      <div class="clim-top">
-        <div class="clim-cur"><span id="climCur">--</span><small id="climUnit">°F</small></div>
-        <div class="clim-meta">
-          <div id="climState" class="clim-state">—</div>
-          <div id="climHum" class="clim-hum"></div>
-        </div>
-      </div>
-      <div class="clim-setrow">
-        <button id="climDown" type="button" aria-label="Lower setpoint">−</button>
-        <div class="clim-set"><span id="climSet">--</span><small>° target</small></div>
-        <button id="climUp" type="button" aria-label="Raise setpoint">+</button>
-      </div>
-      <div class="seg" id="climModes" role="radiogroup" aria-label="Thermostat mode"></div>
-      <div class="clim-err" id="climErr" aria-live="polite"></div>
-      <div class="clim-hint" id="climHint">Connect Home Assistant in ⚙ to enable climate control.</div>
-    </div>
+    <div class="clim-grid" id="climGrid"></div>
+    <div class="clim-err" id="climErr" aria-live="polite"></div>
+    <div class="clim-hint" id="climHint">Connect Home Assistant in ⚙ to enable climate control.</div>
   </div>
 </main>
 <footer>
@@ -927,7 +920,7 @@ load(); setInterval(load, REFRESH_MS);
     const ha = getHa();
     const st = document.getElementById("haStatus");
     if (ha){
-      st.textContent = "Connected · " + (ha.entity || "thermostat…") + " · " + ha.url;
+      st.textContent = "Connected · " + ha.url;
       if (!document.getElementById("haUrl").value) document.getElementById("haUrl").value = ha.url;
     } else {
       st.textContent = "Not connected.";
@@ -941,7 +934,7 @@ load(); setInterval(load, REFRESH_MS);
     brokerFetch(code).then(function(b){
       const url = (document.getElementById("haUrl").value.trim() || b.haUrl || "").replace(/\/+$/, "");
       if (!url){ msg.textContent = "Enter your Home Assistant URL."; return; }
-      saveHa({url: url, token: b.haToken, entity: ""});
+      saveHa({url: url, token: b.haToken});
       const feeds = getFeeds();
       feeds.forEach(function(f){ if (b.writeKey) f.key = b.writeKey; });
       saveFeeds(feeds);
@@ -1022,7 +1015,7 @@ load(); setInterval(load, REFRESH_MS);
  * never in the repo.
  * ------------------------------------------------------------------ */
 const LS_HA = "tb-ha";
-let climUnit = null, climEid = null, climData = null;
+let climUnit = null;
 
 function getHa(){
   try{
@@ -1078,22 +1071,22 @@ document.querySelectorAll("#viewTabs button").forEach(function(b){
 });
 
 /* ---- climate ---- */
+/* The 5 room AC minisplits. (HA also has Tesla / pool / spa climate
+ * entities, but those stay off the wall dashboard by design.) */
+const HA_CLIMATE_IDS = [
+  "climate.kids_ac",
+  "climate.kitchen_ac",
+  "climate.master_ac",
+  "climate.playroom_ac",
+  "climate.workout_ac"
+];
+let climStates = {}; // entity_id -> last state object
 function haUnit(){
   if (climUnit) return Promise.resolve(climUnit);
   return haFetch("/api/config").then(function(c){
     climUnit = (c.unit_system && c.unit_system.temperature) || "°F";
     return climUnit;
   }).catch(function(){ climUnit = "°F"; return climUnit; });
-}
-function discoverClimateEntity(){
-  return haFetch("/api/states").then(function(states){
-    const climates = states.filter(function(s){ return s.entity_id.indexOf("climate.") === 0; });
-    if (!climates.length) throw new Error("no climate entity");
-    const ha = getHa();
-    ha.entity = climates[0].entity_id;
-    saveHa(ha);
-    return ha.entity;
-  });
 }
 function currentSetpoint(a){
   if (a.temperature != null) return a.temperature;
@@ -1103,56 +1096,126 @@ function currentSetpoint(a){
 function loadClimate(){
   const hint = document.getElementById("climHint");
   const err = document.getElementById("climErr");
+  const grid = document.getElementById("climGrid");
   if (!getHa()){
     hint.style.display = "";
     err.textContent = "";
-    document.getElementById("climCur").textContent = "--";
+    grid.innerHTML = "";
     return;
   }
   hint.style.display = "none";
   haUnit().then(function(){
-    const ha = getHa();
-    return ha.entity ? Promise.resolve(ha.entity) : discoverClimateEntity();
-  }).then(function(eid){
-    climEid = eid;
-    return haFetch("/api/states/" + eid);
-  }).then(function(st){
+    return haFetch("/api/states");
+  }).then(function(states){
     err.textContent = "";
-    renderClimate(st);
+    const wanted = {};
+    HA_CLIMATE_IDS.forEach(function(id){ wanted[id] = true; });
+    const found = states.filter(function(s){ return wanted[s.entity_id]; });
+    climStates = {};
+    found.forEach(function(s){ climStates[s.entity_id] = s; });
+    renderClimateGrid(found);
   }).catch(function(){
     err.textContent = "Couldn't reach Home Assistant.";
   });
 }
-function renderClimate(st){
-  const a = st.attributes || {};
-  climData = {attrs: a, state: st.state};
-  document.getElementById("climCur").textContent = (a.current_temperature != null) ? Math.round(a.current_temperature) : "--";
-  document.getElementById("climUnit").textContent = climUnit;
-  let sub = st.state.charAt(0).toUpperCase() + st.state.slice(1);
-  if (a.hvac_action && a.hvac_action !== st.state) sub += " · " + a.hvac_action;
-  document.getElementById("climState").textContent = sub;
-  document.getElementById("climHum").textContent = (a.current_humidity != null) ? Math.round(a.current_humidity) + "% humidity" : "";
-  const set = currentSetpoint(a);
-  document.getElementById("climSet").textContent = (set != null) ? Math.round(set) : "--";
-  const box = document.getElementById("climModes");
-  box.innerHTML = "";
-  (a.hvac_modes || []).forEach(function(m){
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = m;
-    if (m === st.state) b.classList.add("on");
-    b.addEventListener("click", function(){ setHvacMode(m); });
-    box.appendChild(b);
+function climCardEl(eid){
+  return document.querySelector('.climcard[data-eid="' + eid + '"]');
+}
+function renderClimateGrid(list){
+  const grid = document.getElementById("climGrid");
+  grid.innerHTML = "";
+  if (!list.length){
+    document.getElementById("climErr").textContent = "No thermostats found in Home Assistant.";
+    return;
+  }
+  list.forEach(function(st){
+    const a = st.attributes || {};
+    const card = document.createElement("div");
+    card.className = "climcard";
+    card.setAttribute("data-eid", st.entity_id);
+
+    const name = document.createElement("div");
+    name.className = "clim-name";
+    name.textContent = a.friendly_name || st.entity_id;
+    card.appendChild(name);
+
+    const top = document.createElement("div");
+    top.className = "clim-top";
+    const cur = document.createElement("div");
+    cur.className = "clim-cur";
+    const curV = document.createElement("span");
+    curV.textContent = (a.current_temperature != null) ? Math.round(a.current_temperature) : "--";
+    cur.appendChild(curV);
+    const unit = document.createElement("small");
+    unit.textContent = climUnit;
+    cur.appendChild(unit);
+    top.appendChild(cur);
+    const meta = document.createElement("div");
+    meta.className = "clim-meta";
+    const stateD = document.createElement("div");
+    stateD.className = "clim-state";
+    let sub = st.state.charAt(0).toUpperCase() + st.state.slice(1);
+    if (a.hvac_action && a.hvac_action !== st.state) sub += " · " + a.hvac_action;
+    stateD.textContent = sub;
+    meta.appendChild(stateD);
+    if (a.current_humidity != null){
+      const hum = document.createElement("div");
+      hum.className = "clim-hum";
+      hum.textContent = Math.round(a.current_humidity) + "% humidity";
+      meta.appendChild(hum);
+    }
+    top.appendChild(meta);
+    card.appendChild(top);
+
+    const setrow = document.createElement("div");
+    setrow.className = "clim-setrow";
+    const down = document.createElement("button");
+    down.type = "button"; down.textContent = "−";
+    down.setAttribute("aria-label", "Lower setpoint");
+    down.addEventListener("click", function(){ nudgeSetpoint(st.entity_id, -1); });
+    const setD = document.createElement("div");
+    setD.className = "clim-set";
+    const setV = document.createElement("span");
+    const set = currentSetpoint(a);
+    setV.textContent = (set != null) ? Math.round(set) : "--";
+    setD.appendChild(setV);
+    const setL = document.createElement("small");
+    setL.textContent = "° target";
+    setD.appendChild(setL);
+    const up = document.createElement("button");
+    up.type = "button"; up.textContent = "+";
+    up.setAttribute("aria-label", "Raise setpoint");
+    up.addEventListener("click", function(){ nudgeSetpoint(st.entity_id, 1); });
+    setrow.appendChild(down); setrow.appendChild(setD); setrow.appendChild(up);
+    card.appendChild(setrow);
+
+    const modes = document.createElement("div");
+    modes.className = "seg clim-modes";
+    modes.setAttribute("role", "radiogroup");
+    modes.setAttribute("aria-label", "Thermostat mode");
+    (a.hvac_modes || []).forEach(function(m){
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = m;
+      if (m === st.state) b.classList.add("on");
+      b.addEventListener("click", function(){ setHvacMode(st.entity_id, m); });
+      modes.appendChild(b);
+    });
+    card.appendChild(modes);
+    grid.appendChild(card);
   });
 }
-function nudgeSetpoint(d){
-  if (!climData || !climEid) return;
-  const a = climData.attrs;
+function nudgeSetpoint(eid, d){
+  const st = climStates[eid];
+  if (!st) return;
+  const a = st.attributes || {};
   const cur = currentSetpoint(a);
   if (cur == null) return;
   const next = cur + d;
-  document.getElementById("climSet").textContent = Math.round(next); // optimistic
-  const body = {entity_id: climEid};
+  const card = climCardEl(eid);
+  const setV = card ? card.querySelector(".clim-set span") : null;
+  if (setV) setV.textContent = Math.round(next); // optimistic
+  const body = {entity_id: eid};
   if (a.target_temp_high != null && a.temperature == null){
     const spread = a.target_temp_high - (a.target_temp_low != null ? a.target_temp_low : a.target_temp_high);
     body.target_temp_high = next;
@@ -1167,14 +1230,11 @@ function nudgeSetpoint(d){
       loadClimate();
     });
 }
-function setHvacMode(m){
-  if (!climEid) return;
-  haFetch("/api/services/climate/set_hvac_mode", {method: "POST", body: {entity_id: climEid, hvac_mode: m}})
+function setHvacMode(eid, m){
+  haFetch("/api/services/climate/set_hvac_mode", {method: "POST", body: {entity_id: eid, hvac_mode: m}})
     .then(function(){ loadClimate(); })
     .catch(function(){ document.getElementById("climErr").textContent = "Couldn't set mode."; });
 }
-document.getElementById("climUp").addEventListener("click", function(){ nudgeSetpoint(1); });
-document.getElementById("climDown").addEventListener("click", function(){ nudgeSetpoint(-1); });
 setInterval(function(){
   if (!document.getElementById("climateView").hidden) loadClimate();
 }, 60000);
