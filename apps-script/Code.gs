@@ -42,6 +42,8 @@ function doGet(e) {
   if (params.action === "complete") return doComplete(params);
   if (params.action === "storeToken") return doStoreToken(params);
   if (params.action === "fetchToken") return doFetchToken(params);
+  if (params.action === "pairingOn") return doPairingOn(params);
+  if (params.action === "pairingOff") return doPairingOff(params);
   var payload = {
     agenda: getAgenda(),
     taskLists: getTaskLists(),
@@ -96,9 +98,45 @@ function doComplete(params) {
  *
  *  FETCH (from the device):
  *    ?action=fetchToken&code=AB12&callback=cb
- *  Returns {writeKey, haToken, haUrl} ONCE, then deletes it. No key needed —
- *  the short code is the credential and it self-destructs on use.
+ *  Returns {writeKey, haToken, haUrl}. No key needed — the short code is
+ *  the credential. While pairing mode is ON, one code can pair any
+ *  number of devices; pairingOff wipes all unused codes.
+ *  Fetch is refused unless pairing mode is ON (see below).
+ *
+ *  PAIRING MODE (for pairing several devices without single-use-only
+ *  juggling). Key-guarded, toggled from your computer:
+ *    ?action=pairingOn&key=<TASKBOARD_SECRET>   → fetches are allowed
+ *    ?action=pairingOff&key=<TASKBOARD_SECRET>  → fetches are refused and
+ *       any still-unused PAIR_<CODE> bundles are wiped
+ *  Default is OFF. Typical flow: pairingOn → store ONE code → pair all
+ *  devices with that code → pairingOff (wipes the code).
  */
+function doPairingOn(params) {
+  if (!checkSecret(params)) return respond({ok: false, error: "bad key"}, params.callback);
+  PropertiesService.getScriptProperties().setProperty("PAIRING_MODE", "on");
+  return respond({ok: true, pairing: true}, params.callback);
+}
+
+function doPairingOff(params) {
+  if (!checkSecret(params)) return respond({ok: false, error: "bad key"}, params.callback);
+  var props = PropertiesService.getScriptProperties();
+  var all = props.getProperties();
+  for (var name in all) {
+    if (name.indexOf("PAIR_") === 0) props.deleteProperty(name);
+  }
+  props.setProperty("PAIRING_MODE", "off");
+  return respond({ok: true, pairing: false}, params.callback);
+}
+
+function pairingEnabled() {
+  return PropertiesService.getScriptProperties().getProperty("PAIRING_MODE") === "on";
+}
+
+function checkSecret(params) {
+  var secret = PropertiesService.getScriptProperties().getProperty("TASKBOARD_SECRET") || "";
+  return !!secret && params.key === secret;
+}
+
 function doStoreToken(params) {
   var secret = PropertiesService.getScriptProperties().getProperty("TASKBOARD_SECRET") || "";
   if (!secret || params.key !== secret) {
@@ -117,11 +155,11 @@ function doStoreToken(params) {
 }
 
 function doFetchToken(params) {
+  if (!pairingEnabled()) return respond({ok: false, error: "pairing off"}, params.callback);
   var code = String(params.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
   var props = PropertiesService.getScriptProperties();
   var raw = props.getProperty("PAIR_" + code);
   if (!raw) return respond({ok: false, error: "not found"}, params.callback);
-  props.deleteProperty("PAIR_" + code); // single use
   return respond({ok: true, bundle: JSON.parse(raw)}, params.callback);
 }
 
