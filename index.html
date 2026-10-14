@@ -385,6 +385,10 @@
   </div>
 </div>
 
+<div id="detailOverlay" class="detail-overlay" hidden>
+  <div class="detail-card" id="detailCard" role="dialog" aria-modal="true"></div>
+</div>
+
 <script>
 "use strict";
 /* ------------------------------------------------------------------
@@ -1381,8 +1385,5 @@ setInterval(function(){
   }).catch(function(){ /* leave the hash; settings panel remains the fallback */ });
 })();
 </script>
-<div id="detailOverlay" class="detail-overlay" hidden>
-  <div class="detail-card" id="detailCard" role="dialog" aria-modal="true"></div>
-</div>
 </body>
 </html>
