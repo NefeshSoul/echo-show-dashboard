@@ -75,12 +75,12 @@ through a short pairing code brokered by the Apps Script:
 **Home Assistant side (one time):**
 1. HA must be reachable over HTTPS (Nabu Casa, DuckDNS + Let's Encrypt,
    Cloudflare tunnel…), since the HTTPS dashboard page can't call plain-HTTP APIs.
-2. Allow the dashboard origin in `configuration.yaml`, then restart:
-   ```yaml
-   http:
-     cors_allowed_origins:
-       - https://nefeshsoul.github.io
-   ```
+2. Allow the dashboard origin. On HA 2026.8+ the YAML `http:` block is
+   ignored — set it in the UI instead: Settings → System → Network →
+   scroll to the HTTP server section → "CORS allowed origins" →
+   replace the default with `https://nefeshsoul.github.io` → Save.
+   Saving restarts HA Core; confirm the new HTTP server configuration
+   when prompted (within 5 minutes) or it rolls back.
 3. Create a long-lived access token (your profile → Long-lived access tokens).
    Prefer minting it as a dedicated limited user.
 
@@ -89,17 +89,29 @@ through a short pairing code brokered by the Apps Script:
 file as a New version, and set the `TASKBOARD_SECRET` script property to a
 fresh random value (it guards the write endpoints — keep it out of the repo).
 
-**Pair a device:**
-1. On your computer, open (all copy-paste, no typing on the device):
-   `https://script.google.com/macros/s/<ACCOUNT1_EXEC>/exec?action=storeToken&code=<4-8 CHARS OF YOUR CHOICE>&key=<TASKBOARD_SECRET>&haToken=<paste>&haUrl=https://your-ha:8123`
-   → responds `{"ok":true,"code":"…"}`.
-2. On the device: ⚙ → Home Assistant → type the code → Connect.
-   The page fetches the token + write key, saves them to that device's
-   localStorage, and the broker burns the code (single use). The thermostat
-   entity is auto-discovered (first `climate.*` entity).
+**Pair devices (pairing mode):** pairing is gated by an on/off switch so a
+code only works while you say so. All calls below are copy-paste on your
+computer (key-guarded by `TASKBOARD_SECRET`):
+1. Turn pairing on:
+   `https://script.google.com/macros/s/<ACCOUNT1_EXEC>/exec?action=pairingOn&key=<TASKBOARD_SECRET>`
+   → `{"ok":true,"pairing":true}`.
+2. Store one code (8 chars recommended; the code is the credential while
+   pairing is on, so keep it unguessable and turn pairing off when done):
+   `…/exec?action=storeToken&code=<CODE>&key=<TASKBOARD_SECRET>&haToken=<paste>&haUrl=https://your-ha`
+   → `{"ok":true,"code":"…"}`.
+3. On each device: ⚙ → Home Assistant → **HA pairing code** → Connect.
+   The page fetches the token + write key and saves them to that device's
+   localStorage. The same code works on every device while pairing is on.
+4. Turn pairing off:
+   `…/exec?action=pairingOff&key=<TASKBOARD_SECRET>`
+   → unused codes are wiped and `fetchToken` is refused while off.
+   (Codes can also be stored while pairing is off — they just can't be
+   fetched until you turn it on.)
 
 The Climate tab then shows current temp, setpoint steppers, and mode buttons,
-refreshing every 60 seconds while visible.
+refreshing every 60 seconds while visible. The five room-AC entities are
+hardcoded in the page; the Tesla/pool/spa climate entities are excluded by
+design.
 
 ### 2. Create the skill
 
