@@ -201,6 +201,29 @@
 
   .task{transition:opacity .35s ease}
   .task.done{opacity:0}
+
+  /* Details modal: tap a task row or event for details; tap outside to close.
+     Only the checkbox completes a task. */
+  .detail-overlay{position:fixed; inset:0; background:rgba(4,6,10,.72); z-index:60;
+    display:flex; align-items:center; justify-content:center; padding:24px}
+  .detail-overlay[hidden]{display:none}
+  .detail-card{background:var(--panel); border:1px solid var(--line); border-radius:18px;
+    max-width:560px; width:100%; max-height:80vh; overflow:auto; padding:28px 30px;
+    box-shadow:0 18px 60px rgba(0,0,0,.55)}
+  .detail-card h2{font-size:32px; margin:0 0 14px; line-height:1.25}
+  .detail-card .drow{display:flex; gap:10px; align-items:baseline; font-size:21px;
+    color:var(--dim); margin:9px 0}
+  .detail-card .drow b{color:var(--ink); font-weight:600}
+  .detail-card .dchip{display:inline-block; font-size:16px; padding:4px 14px;
+    border-radius:16px; border:1px solid}
+  .detail-card .cdot{width:13px; height:13px; border-radius:50%; flex:0 0 auto;
+    align-self:center}
+  .detail-hint{margin-top:18px; font-size:16px; color:var(--faint)}
+  body.compact .detail-card{padding:20px; max-width:440px}
+  body.compact .detail-card h2{font-size:24px}
+  body.compact .detail-card .drow{font-size:16px}
+  button.box{background:none; border:2px solid var(--faint); cursor:pointer; padding:0; font:inherit}
+  .event, .evt:not(.none), .task{cursor:pointer}
   .srow{margin:8px 0 2px}
   .srow .lab{display:flex; justify-content:space-between; font-size:18px;
     color:var(--dim); margin-bottom:2px}
@@ -539,7 +562,8 @@ function eventRow(e, isToday, multi){
             : (isToday && !allDay && now >= en ? "past" : "");
   const sub = (multi && e._acct ? [e._acct] : []).concat([e.cal, e.location])
     .filter(Boolean).join(" · ");
-  return `<div class="event ${cls}">
+  calEvIndex.push(e);
+  return `<div class="event ${cls}" data-evi="${calEvIndex.length - 1}">
       <div class="etime">${esc(e.start)}${e.end ? "–" + esc(e.end) : ""}</div><div class="bar" style="background:${colorFor(e.cal)}"></div>
       <div><div class="etitle">${esc(e.title)}</div>
       ${sub ? `<div class="eloc">${esc(sub)}</div>` : ""}</div>
@@ -548,6 +572,7 @@ function eventRow(e, isToday, multi){
 
 function renderCalendar(el, feeds){
   const view = getCalView();
+  calEvIndex = [];
   document.querySelectorAll(".seg button").forEach(b => {
     const on = b.dataset.view === view;
     b.classList.toggle("on", on);
@@ -606,11 +631,13 @@ function weekHtml(byDay){
     html += `<div class="day${i === 0 ? " today" : ""}">` +
       `<h4><span>${esc(d.toLocaleDateString(undefined, {weekday: "short"}))}</span>` +
       `<b>${d.getDate()}</b></h4>` +
-      (evs.length ? evs.map(e =>
-        `<div class="evt${e.end ? "" : " allday"}" style="border-color:${colorFor(e.cal)}">` +
+      (evs.length ? evs.map(e => {
+        calEvIndex.push(e);
+        const evi = calEvIndex.length - 1;
+        return `<div class="evt${e.end ? "" : " allday"}" data-evi="${evi}" style="border-color:${colorFor(e.cal)}">` +
         (e.end ? `<span class="t">${esc(e.start)}</span>` : `<span class="t">all day</span>`) +
-        `<span>${esc(e.title)}</span></div>`
-      ).join("") : `<div class="evt none">—</div>`) +
+        `<span>${esc(e.title)}</span></div>`;
+      }).join("") : `<div class="evt none">—</div>`) +
       `</div>`;
   }
   return html + "</div>";
@@ -698,7 +725,7 @@ function taskRow(item){
     if (d < today){ dueCls = "overdue"; }
   }
   return `<div class="task" data-list="${esc(item.listId)}" data-id="${esc(item.id)}">` +
-    `<div class="box" style="border-color:${c}"></div>` +
+    `<button type="button" class="box" style="border-color:${c}" aria-label="Complete task"></button>` +
     `<div class="t" style="color:${c}">${esc(t.title)}</div>` +
     (dueLabel ? `<div class="due ${dueCls}">${esc(dueLabel)}</div>` : "") + `</div>`;
 }
@@ -707,6 +734,7 @@ function esc(s){ return String(s).replace(/[&<>"']/g, c =>
   ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
 let lastFeeds = [];
+let calEvIndex = []; /* flat index of rendered events for the details modal */
 
 async function load(){
   let feeds = [], demo = false;
@@ -806,12 +834,93 @@ document.getElementById("tasks").addEventListener("click", function(e){
   const block = row.closest ? row.closest(".tblock") : null;
   const feedIdx = block ? parseInt(block.getAttribute("data-feed"), 10) : NaN;
   if (isNaN(feedIdx)) return;
-  completeTask(feedIdx, row.getAttribute("data-list"), row.getAttribute("data-id"), row);
+  const box = e.target && e.target.closest ? e.target.closest(".box") : null;
+  if (box){
+    completeTask(feedIdx, row.getAttribute("data-list"), row.getAttribute("data-id"), row);
+  } else {
+    openTaskDetail(feedIdx, row.getAttribute("data-list"), row.getAttribute("data-id"));
+  }
 });
 
 document.querySelectorAll(".sechead .seg button").forEach(function(b){
   b.addEventListener("click", function(){ setCalView(b.dataset.view); renderAll(); });
 });
+
+document.getElementById("agenda").addEventListener("click", function(e){
+  const el = e.target && e.target.closest ? e.target.closest("[data-evi]") : null;
+  if (!el || el.classList.contains("none")) return;
+  openEventDetail(parseInt(el.getAttribute("data-evi"), 10));
+});
+
+/* Details modal: tap a task row or an event to see details; tap outside the
+ * card (or Escape) to close. Only the checkbox completes a task. */
+const detailOverlay = document.getElementById("detailOverlay");
+const detailCard = document.getElementById("detailCard");
+function showDetail(html){
+  detailCard.innerHTML = html;
+  detailOverlay.hidden = false;
+}
+function closeDetail(){ detailOverlay.hidden = true; }
+detailOverlay.addEventListener("click", function(e){
+  if (e.target === detailOverlay) closeDetail();
+});
+document.addEventListener("keydown", function(e){
+  if (e.key === "Escape" && !detailOverlay.hidden) closeDetail();
+});
+
+function fmtDue(due){
+  if (due === "today") return "Today";
+  if (due === "overdue") return "Overdue";
+  if (!due) return "";
+  const d = new Date(due + "T12:00:00");
+  return isNaN(d) ? due
+    : d.toLocaleDateString(undefined, {weekday: "long", month: "long", day: "numeric"});
+}
+
+function openTaskDetail(feedIdx, listId, taskId){
+  const feed = lastFeeds[feedIdx] || {};
+  const lid = String(listId || ""), tid = String(taskId || "");
+  let found = null, listName = "";
+  (feed.taskLists || []).forEach(l => {
+    (l.tasks || []).forEach(t => {
+      if (String(t.list || "") === lid && String(t.id || "") === tid){
+        found = t; listName = l.name;
+      }
+    });
+  });
+  if (!found) return;
+  const c = colorFor(listName);
+  const due = fmtDue(found.due);
+  showDetail(
+    `<h2>${esc(found.title)}</h2>` +
+    `<div class="drow"><span class="dchip" style="border-color:${c};color:${c}">${esc(listName)}</span></div>` +
+    (due ? `<div class="drow">Due&nbsp;<b>${esc(due)}</b></div>` : "") +
+    (feed.label ? `<div class="drow">Account&nbsp;<b>${esc(feed.label)}</b></div>` : "") +
+    `<div class="detail-hint">Tap the checkbox on the task row to complete it.</div>`
+  );
+}
+
+function openEventDetail(idx){
+  const e = calEvIndex[idx];
+  if (!e) return;
+  const allDay = !e.end;
+  const when = allDay ? "All day" : (e.start + (e.end ? " \u2013 " + e.end : ""));
+  let dayLine = "";
+  if (e.date){
+    const d = new Date(e.date + "T12:00:00");
+    if (!isNaN(d)) dayLine = d.toLocaleDateString(undefined,
+      {weekday: "long", month: "long", day: "numeric"});
+  }
+  const c = colorFor(e.cal);
+  showDetail(
+    `<h2>${esc(e.title)}</h2>` +
+    (dayLine ? `<div class="drow"><b>${esc(dayLine)}</b></div>` : "") +
+    `<div class="drow">${esc(when)}</div>` +
+    (e.location ? `<div class="drow">\uD83D\uDCCD&nbsp;<b>${esc(e.location)}</b></div>` : "") +
+    (e.cal ? `<div class="drow"><span class="cdot" style="background:${c}"></span>&nbsp;${esc(e.cal)}</div>` : "") +
+    (e._acct ? `<div class="drow">Account&nbsp;<b>${esc(e._acct)}</b></div>` : "")
+  );
+}
 
 function tickClock(){
   const d = new Date();
@@ -1272,5 +1381,8 @@ setInterval(function(){
   }).catch(function(){ /* leave the hash; settings panel remains the fallback */ });
 })();
 </script>
+<div id="detailOverlay" class="detail-overlay" hidden>
+  <div class="detail-card" id="detailCard" role="dialog" aria-modal="true"></div>
+</div>
 </body>
 </html>
