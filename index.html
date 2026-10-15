@@ -953,6 +953,7 @@ load(); setInterval(load, REFRESH_MS);
  * ------------------------------------------------------------------ */
 (function silkKeepAlive(){
   if (!isShowMode()) return; /* keep-alive only matters on the Echo Show; pointless on desktop */
+  var state = { audio: false, video: false, wakeLock: false, mediaSession: false };
   function silentWavURL(seconds, rate){
     seconds = seconds || 2; rate = rate || 8000;
     var n = Math.floor(seconds * rate);
@@ -967,28 +968,91 @@ load(); setInterval(load, REFRESH_MS);
     for (var i = 0; i < n; i++) v.setUint8(44 + i, 128); /* 8-bit silence */
     return URL.createObjectURL(new Blob([buf], {type: "audio/wav"}));
   }
-  function start(){
+  /* 1. Silent looping audio — the classic "media is playing" signal. */
+  function startAudio(){
     try{
       var a = document.createElement("audio");
-      a.muted = true; a.loop = true; a.autoplay = true;
+      a.muted = true; a.loop = true;
       a.setAttribute("playsinline", "");
       a.src = silentWavURL();
       a.style.display = "none";
       document.body.appendChild(a);
       var p = a.play();
-      if (p && p.catch) p.catch(function(){
-        document.addEventListener("pointerdown", function(){ a.play(); }, {once: true});
-      });
+      if (p && p.then){
+        p.then(function(){ state.audio = true; })
+         .catch(function(){
+           document.addEventListener("pointerdown", function(){ a.play(); }, {once: true});
+         });
+      } else { state.audio = true; }
+      /* 2. Media Session: tell the OS a media session is actively playing. */
+      try{
+        if ("mediaSession" in navigator){
+          navigator.mediaSession.metadata = new MediaMetadata({title: "Dashboard"});
+          navigator.mediaSession.playbackState = "playing";
+          state.mediaSession = true;
+        }
+      }catch(e){}
     }catch(e){ /* keep-alive is best-effort */ }
+  }
+  /* 3. Tiny looping video via canvas stream — some Chromium builds treat video
+   * as a stronger "active media" signal than audio. Invisible 2px square. */
+  function startVideo(){
+    try{
+      var c = document.createElement("canvas");
+      c.width = 2; c.height = 2;
+      var ctx = c.getContext("2d");
+      if (!c.captureStream) return;
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 2, 2);
+      var v = document.createElement("video");
+      v.muted = true; v.loop = true;
+      v.setAttribute("playsinline", "");
+      v.style.cssText = "position:fixed;width:2px;height:2px;opacity:0.01;pointer-events:none;bottom:0;right:0;";
+      v.srcObject = c.captureStream(1);
+      document.body.appendChild(v);
+      setInterval(function(){ ctx.fillRect(0, 0, 1, 1); }, 5000); /* keep the track live */
+      var p = v.play();
+      if (p && p.then) p.then(function(){ state.video = true; }).catch(function(){});
+      else state.video = true;
+    }catch(e){}
+  }
+  /* 4. Screen Wake Lock — the web-standard "keep the screen on" mechanism.
+   * Re-requested when the page becomes visible again or the lock is released. */
+  function requestWakeLock(){
+    try{
+      if (!("wakeLock" in navigator)) return;
+      navigator.wakeLock.request("screen").then(function(lock){
+        state.wakeLock = true;
+        lock.addEventListener("release", function(){
+          state.wakeLock = false;
+          if (document.visibilityState === "visible")
+            setTimeout(requestWakeLock, 3000); /* back off, avoid a hot loop */
+        });
+      }).catch(function(){ state.wakeLock = false; });
+    }catch(e){}
+  }
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState === "visible") requestWakeLock();
+  });
+  function start(){
+    startAudio();
+    startVideo();
+    requestWakeLock();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();
-  if (isShowMode()) document.addEventListener("pointerdown", function(){
+  document.addEventListener("pointerdown", function(){
     try{
       var el = document.documentElement;
       if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen();
     }catch(e){}
   });
+  /* Status for the settings panel, so a device can report what actually engaged. */
+  window.__keepAliveStatus = function(){
+    return "audio " + (state.audio ? "on" : "off") +
+      ", video " + (state.video ? "on" : "off") +
+      ", wake lock " + (state.wakeLock ? "on" : ("wakeLock" in navigator ? "off" : "unsupported")) +
+      ", media session " + (state.mediaSession ? "on" : "off");
+  };
 })();
 
 /* Settings panel: two account feeds (label + URL + optional secret key),
@@ -1021,7 +1085,8 @@ load(); setInterval(load, REFRESH_MS);
     document.getElementById("uaInfo").textContent =
       (IS_SILK ? "This browser was detected as Amazon Silk. "
                : "Not detected as Silk — if this is an Echo Show, turn on the toggle above. ") +
-      "UA: " + String(navigator.userAgent || "").slice(0, 100);
+      "UA: " + String(navigator.userAgent || "").slice(0, 100) +
+      (window.__keepAliveStatus ? " Keep-alive: " + window.__keepAliveStatus() : "");
     overlay.hidden = false;
   });
   document.getElementById("showMode").addEventListener("change", function(e){
