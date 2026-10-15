@@ -153,6 +153,7 @@
   .seg button.on{background:#26314a; color:var(--ink); font-weight:600}
   .dayhead{font-size:17px; text-transform:uppercase; letter-spacing:2px;
     color:var(--accent); margin:20px 0 4px}
+  .dayhead.weekend{color:#a9c8f5}
   .dayhead:first-child{margin-top:0}
   #tasks{overflow:hidden; flex:1 1 auto; min-height:0; display:flex}
   .tblocks{display:grid; gap:26px; height:100%; width:100%}
@@ -172,6 +173,7 @@
   .weekgrid .day{background:var(--panel2); border:1px solid var(--line);
     border-radius:12px; padding:10px; overflow:hidden}
   .weekgrid .day.today{border-color:var(--accent)}
+  .weekgrid .day.weekend{background:#151c2e}
   .weekgrid .day h4{display:flex; align-items:baseline; justify-content:space-between;
     margin-bottom:6px}
   .weekgrid .day h4 span{font-size:13px; text-transform:uppercase;
@@ -557,6 +559,10 @@ function dayLabel(dateStr){
   return new Date(dateStr + "T12:00:00")
     .toLocaleDateString(undefined, {weekday: "long", month: "short", day: "numeric"});
 }
+function isWeekend(dateStr){
+  const wd = new Date(dateStr + "T12:00:00").getDay();
+  return wd === 0 || wd === 6;
+}
 
 function eventRow(e, isToday, multi){
   const now = nowMin();
@@ -607,7 +613,7 @@ function renderCalendar(el, feeds){
     const dt = dstr(i);
     const evs = byDay[dt] || [];
     if (!evs.length && i !== 0) continue;
-    html += `<div class="dayhead">${esc(dayLabel(dt))}</div>`;
+    html += `<div class="dayhead${isWeekend(dt) ? " weekend" : ""}">${esc(dayLabel(dt))}</div>`;
     html += evs.length
       ? evs.map(e => eventRow(e, i === 0, multi)).join("")
       : `<div class="empty">Nothing scheduled.</div>`;
@@ -632,7 +638,7 @@ function weekHtml(byDay){
     const dt = dstr(i);
     const d = new Date(dt + "T12:00:00");
     const evs = byDay[dt] || [];
-    html += `<div class="day${i === 0 ? " today" : ""}">` +
+    html += `<div class="day${i === 0 ? " today" : ""}${isWeekend(dt) ? " weekend" : ""}">` +
       `<h4><span>${esc(d.toLocaleDateString(undefined, {weekday: "short"}))}</span>` +
       `<b>${d.getDate()}</b></h4>` +
       (evs.length ? evs.map(e => {
