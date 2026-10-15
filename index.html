@@ -946,8 +946,10 @@ load(); setInterval(load, REFRESH_MS);
 
 /* ------------------------------------------------------------------
  * Silk keep-alive (Echo Show): Silk returns to the home screen after a
- * few idle minutes. A muted, looping silent audio track counts as media
- * playback and keeps the page alive. Fully silent.
+ * few idle minutes. Four mechanisms: a *pulsed* silent audio track
+ * (fresh media activity every 60s — a plain loop does NOT reset Silk's
+ * idle timer), an invisible looping canvas video, the Screen Wake Lock,
+ * and a Media Session marked "playing". Fully silent.
  * Also requests fullscreen on first tap (needs a user gesture), which
  * hides browser chrome in browsers that honor it.
  * ------------------------------------------------------------------ */
@@ -968,31 +970,51 @@ load(); setInterval(load, REFRESH_MS);
     for (var i = 0; i < n; i++) v.setUint8(44 + i, 128); /* 8-bit silence */
     return URL.createObjectURL(new Blob([buf], {type: "audio/wav"}));
   }
-  /* 1. Silent looping audio — the classic "media is playing" signal. */
-  function startAudio(){
+  /* 1. Pulsed silent audio — the classic "media is playing" signal, done
+   * the way that actually resets Silk's idle timer. A looping track does
+   * NOT do it: per community evidence (openframe's 2026-08 port of the
+   * DaGammla keep-silk-open technique), loop=true "never generated fresh
+   * media/network activity, which is what actually resets Silk's idle
+   * timer". So we play a short silent clip from a FRESH blob URL every
+   * 60s — each start is new media activity for Silk. Fully silent. */
+  var PULSE_EVERY_MS = 60000, PULSE_CLIP_S = 3, pulseTimer = null;
+  function pulseAudio(){
     try{
+      var url = silentWavURL(PULSE_CLIP_S);
       var a = document.createElement("audio");
-      a.muted = true; a.loop = true;
+      a.muted = true;
       a.setAttribute("playsinline", "");
-      a.src = silentWavURL();
+      a.src = url;
       a.style.display = "none";
       document.body.appendChild(a);
+      var done = function(){
+        try{ URL.revokeObjectURL(url); }catch(e){}
+        try{ a.remove(); }catch(e){}
+      };
+      a.addEventListener("ended", function(){ done(); });
+      a.addEventListener("error", function(){ done(); });
       var p = a.play();
-      if (p && p.then){
-        p.then(function(){ state.audio = true; })
-         .catch(function(){
-           document.addEventListener("pointerdown", function(){ a.play(); }, {once: true});
-         });
-      } else { state.audio = true; }
-      /* 2. Media Session: tell the OS a media session is actively playing. */
-      try{
-        if ("mediaSession" in navigator){
-          navigator.mediaSession.metadata = new MediaMetadata({title: "Dashboard"});
-          navigator.mediaSession.playbackState = "playing";
-          state.mediaSession = true;
-        }
-      }catch(e){}
+      if (p && p.then) p.then(function(){ state.audio = true; }).catch(function(){ done(); });
+      else state.audio = true;
     }catch(e){ /* keep-alive is best-effort */ }
+  }
+  function startPulse(){
+    if (pulseTimer) return;
+    pulseAudio();                                   /* first signal immediately */
+    pulseTimer = setInterval(pulseAudio, PULSE_EVERY_MS);
+  }
+  /* First tap also triggers an immediate pulse, in case the initial
+   * autoplay was blocked and we're waiting on the next 60s tick. */
+  document.addEventListener("pointerdown", function(){ pulseAudio(); }, {once: true});
+  /* 2. Media Session: tell the OS a media session is actively playing. */
+  function startMediaSession(){
+    try{
+      if ("mediaSession" in navigator){
+        navigator.mediaSession.metadata = new MediaMetadata({title: "Dashboard"});
+        navigator.mediaSession.playbackState = "playing";
+        state.mediaSession = true;
+      }
+    }catch(e){}
   }
   /* 3. Tiny looping video via canvas stream — some Chromium builds treat video
    * as a stronger "active media" signal than audio. Invisible 2px square. */
@@ -1034,7 +1056,8 @@ load(); setInterval(load, REFRESH_MS);
     if (document.visibilityState === "visible") requestWakeLock();
   });
   function start(){
-    startAudio();
+    startPulse();
+    startMediaSession();
     startVideo();
     requestWakeLock();
   }
@@ -1048,7 +1071,7 @@ load(); setInterval(load, REFRESH_MS);
   });
   /* Status for the settings panel, so a device can report what actually engaged. */
   window.__keepAliveStatus = function(){
-    return "audio " + (state.audio ? "on" : "off") +
+    return "audio(pulse) " + (state.audio ? "on" : "off") +
       ", video " + (state.video ? "on" : "off") +
       ", wake lock " + (state.wakeLock ? "on" : ("wakeLock" in navigator ? "off" : "unsupported")) +
       ", media session " + (state.mediaSession ? "on" : "off");
