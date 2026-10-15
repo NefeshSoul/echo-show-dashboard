@@ -224,11 +224,16 @@ function fmtDate(d) {
 }
 
 function normDue(iso) {
-  // Page understands: "today" | "overdue" | "YYYY-MM-DD" | ""
+  // Page understands: "today" | "YYYY-MM-DD" | ""
+  // Past dates return their real date string — the page renders them in the
+  // overdue color with the date shown. Compared as America/Phoenix calendar
+  // dates (plain string compare), because the Tasks API returns due dates as
+  // UTC-midnight timestamps and Date math on those shifts the day for
+  // timezones behind UTC (and the result also depended on the project's
+  // timezone setting, flipping a day early every evening).
   if (!iso) return "";
-  var today = new Date(); today.setHours(0, 0, 0, 0);
-  var d = new Date(iso); d.setHours(0, 0, 0, 0);
-  if (d.getTime() === today.getTime()) return "today";
-  if (d < today) return "overdue";
-  return iso.slice(0, 10);
+  var todayStr = Utilities.formatDate(new Date(), "America/Phoenix", "yyyy-MM-dd");
+  var dStr = String(iso).slice(0, 10);
+  if (dStr === todayStr) return "today";
+  return dStr;
 }
