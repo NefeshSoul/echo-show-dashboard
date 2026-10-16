@@ -593,7 +593,7 @@ function eventRow(e, isToday, multi){
     .filter(Boolean).join(" · ");
   calEvIndex.push(e);
   return `<div class="event ${cls}" data-evi="${calEvIndex.length - 1}">
-      <div class="etime">${esc(e.start)}${e.end ? "–" + esc(e.end) : ""}</div><div class="bar" style="background:${colorFor(e.cal)}"></div>
+      <div class="etime">${esc(fmt12(e.start))}${e.end ? "–" + esc(fmt12(e.end)) : ""}</div><div class="bar" style="background:${colorFor(e.cal)}"></div>
       <div><div class="etitle">${esc(e.title)}</div>
       ${sub ? `<div class="eloc">${esc(sub)}</div>` : ""}</div>
     </div>`;
@@ -664,7 +664,7 @@ function weekHtml(byDay){
         calEvIndex.push(e);
         const evi = calEvIndex.length - 1;
         return `<div class="evt${e.end ? "" : " allday"}" data-evi="${evi}" style="border-color:${colorFor(e.cal)}">` +
-        (e.end ? `<span class="t">${esc(e.start)}</span>` : `<span class="t">all day</span>`) +
+        (e.end ? `<span class="t">${esc(fmt12(e.start))}</span>` : `<span class="t">all day</span>`) +
         `<span>${esc(e.title)}</span></div>`;
       }).join("") : `<div class="evt none">—</div>`) +
       `</div>`;
@@ -906,6 +906,16 @@ function fmtDue(due){
     : d.toLocaleDateString(undefined, {weekday: "long", month: "long", day: "numeric"});
 }
 
+/* "14:00" -> "2:00 PM" for display; sorting still uses the raw 24h values. */
+function fmt12(t){
+  const m = /^(\d{1,2}):(\d{2})/.exec(t || "");
+  if (!m) return t;
+  let h = parseInt(m[1], 10);
+  const ap = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return h + ":" + m[2] + " " + ap;
+}
+
 function openTaskDetail(feedIdx, listId, taskId){
   const feed = lastFeeds[feedIdx] || {};
   const lid = String(listId || ""), tid = String(taskId || "");
@@ -933,7 +943,7 @@ function openEventDetail(idx){
   const e = calEvIndex[idx];
   if (!e) return;
   const allDay = !e.end;
-  const when = allDay ? "All day" : (e.start + (e.end ? " \u2013 " + e.end : ""));
+  const when = allDay ? "All day" : (fmt12(e.start) + (e.end ? " – " + fmt12(e.end) : ""));
   let dayLine = "";
   if (e.date){
     const d = new Date(e.date + "T12:00:00");
