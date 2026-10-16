@@ -102,6 +102,23 @@
   .clim-set small{display:block; font-size:14px; color:var(--dim); font-weight:400}
   .clim-modes{justify-content:center; margin-top:14px; flex-wrap:wrap}
   .clim-modes button{font-size:15px; padding:8px 14px; text-transform:capitalize}
+  .clim-sechead{font-size:17px; text-transform:uppercase; letter-spacing:3px;
+    color:var(--dim); text-align:center; margin:28px 0 2px}
+  .clim-sechead[hidden]{display:none}
+  .fan-toggle{width:96px; height:96px; border-radius:50%; border:2px solid var(--line);
+    background:#0a0e16; color:var(--dim); font-size:17px; font-weight:700;
+    text-transform:uppercase; letter-spacing:1px; cursor:pointer; margin:10px auto 4px; display:block}
+  .fan-toggle.on{border-color:var(--accent); color:var(--ink); background:#1a2740}
+  .fan-toggle:active{background:#26314a}
+  .fan-pct{font-size:40px; font-weight:300; margin:6px 0 2px}
+  .fan-pct small{font-size:18px; color:var(--dim); font-weight:400}
+  .fan-slider{width:100%; margin:14px 0 4px; -webkit-appearance:none; appearance:none;
+    height:44px; background:transparent; cursor:pointer}
+  .fan-slider::-webkit-slider-runnable-track{height:12px; border-radius:6px; background:#1d2536}
+  .fan-slider::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:44px; height:44px;
+    border-radius:50%; background:var(--accent); margin-top:-16px; border:none}
+  .fan-slider::-moz-range-track{height:12px; border-radius:6px; background:#1d2536}
+  .fan-slider::-moz-range-thumb{width:44px; height:44px; border-radius:50%; background:var(--accent); border:none}
   .clim-err{color:#ff7a7a; font-size:18px; margin-top:14px; min-height:26px; text-align:center}
   .clim-hint{color:var(--faint); font-size:16px; margin-top:6px; text-align:center}
   section{background:var(--panel); border:1px solid var(--line); border-radius:18px;
@@ -317,6 +334,8 @@
   </div>
   <div id="climateView" hidden>
     <div class="clim-grid" id="climGrid"></div>
+    <h3 class="clim-sechead" id="fanHead" hidden>Fans</h3>
+    <div class="clim-grid" id="fanGrid"></div>
     <div class="clim-err" id="climErr" aria-live="polite"></div>
     <div class="clim-hint" id="climHint">Connect Home Assistant in ⚙ to enable climate control.</div>
   </div>
@@ -1288,6 +1307,11 @@ const HA_CLIMATE_IDS = [
   "climate.playroom_ac",
   "climate.workout_ac"
 ];
+/* Modern Forms fans (percentage speed 0-100). */
+const HA_FAN_IDS = [
+  "fan.office_fan_fan",
+  "fan.workout_fan_fan"
+];
 let climStates = {}; // entity_id -> last state object
 function haUnit(){
   if (climUnit) return Promise.resolve(climUnit);
@@ -1309,6 +1333,8 @@ function loadClimate(){
     hint.style.display = "";
     err.textContent = "";
     grid.innerHTML = "";
+    document.getElementById("fanGrid").innerHTML = "";
+    document.getElementById("fanHead").hidden = true;
     return;
   }
   hint.style.display = "none";
@@ -1322,6 +1348,9 @@ function loadClimate(){
     climStates = {};
     found.forEach(function(s){ climStates[s.entity_id] = s; });
     renderClimateGrid(found);
+    const fanWanted = {};
+    HA_FAN_IDS.forEach(function(id){ fanWanted[id] = true; });
+    renderFanGrid(states.filter(function(s){ return fanWanted[s.entity_id]; }));
   }).catch(function(){
     err.textContent = "Couldn't reach Home Assistant.";
   });
@@ -1414,6 +1443,69 @@ function renderClimateGrid(list){
     card.appendChild(modes);
     grid.appendChild(card);
   });
+}
+/* ---- fans: on/off toggle + percentage slider ---- */
+function fanName(st){
+  const n = ((st.attributes || {}).friendly_name || st.entity_id || "").trim();
+  return n.replace(/\s*fan$/i, "") || st.entity_id; /* "Office Fan Fan" -> "Office Fan" */
+}
+function renderFanGrid(list){
+  const grid = document.getElementById("fanGrid");
+  const head = document.getElementById("fanHead");
+  grid.innerHTML = "";
+  head.hidden = !list.length;
+  list.forEach(function(st){
+    const a = st.attributes || {};
+    const on = st.state === "on";
+    const pct = (a.percentage != null) ? Math.round(a.percentage) : 0;
+    const card = document.createElement("div");
+    card.className = "climcard";
+    card.setAttribute("data-eid", st.entity_id);
+    const name = document.createElement("div");
+    name.className = "clim-name";
+    name.textContent = fanName(st);
+    card.appendChild(name);
+    const tog = document.createElement("button");
+    tog.type = "button";
+    tog.className = "fan-toggle";
+    if (on) tog.classList.add("on");
+    tog.textContent = on ? "On" : "Off";
+    tog.setAttribute("aria-label", "Turn fan " + (on ? "off" : "on"));
+    tog.addEventListener("click", function(){ setFanPower(st.entity_id, !on); });
+    card.appendChild(tog);
+    const pctD = document.createElement("div");
+    pctD.className = "fan-pct";
+    pctD.innerHTML = "<span></span><small>% speed</small>";
+    const pctV = pctD.querySelector("span");
+    pctV.textContent = pct;
+    card.appendChild(pctD);
+    const slider = document.createElement("input");
+    slider.type = "range"; slider.className = "fan-slider";
+    slider.min = "0"; slider.max = "100"; slider.step = "1"; slider.value = String(pct);
+    slider.setAttribute("aria-label", "Fan speed percent");
+    slider.addEventListener("input", function(){ pctV.textContent = slider.value; });
+    slider.addEventListener("change", function(){ setFanPct(st.entity_id, parseInt(slider.value, 10)); });
+    card.appendChild(slider);
+    grid.appendChild(card);
+  });
+}
+function setFanPower(eid, on){
+  haFetch("/api/services/fan/turn_" + (on ? "on" : "off"),
+      {method: "POST", body: {entity_id: eid}})
+    .then(function(){ loadClimate(); })
+    .catch(function(){
+      document.getElementById("climErr").textContent = "Couldn't switch the fan.";
+      loadClimate();
+    });
+}
+function setFanPct(eid, pct){
+  haFetch("/api/services/fan/set_percentage",
+      {method: "POST", body: {entity_id: eid, percentage: pct}})
+    .then(function(){ loadClimate(); })
+    .catch(function(){
+      document.getElementById("climErr").textContent = "Couldn't set fan speed.";
+      loadClimate();
+    });
 }
 function nudgeSetpoint(eid, d){
   const st = climStates[eid];
