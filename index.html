@@ -1405,7 +1405,9 @@ function renderClimateGrid(list){
       const b = document.createElement("button");
       b.type = "button";
       b.textContent = m;
-      if (m === st.state) b.classList.add("on");
+      /* Tolerant match: some integrations report state with different
+       * casing/whitespace than hvac_modes on alternate polls. */
+      if (String(m).trim().toLowerCase() === String(st.state).trim().toLowerCase()) b.classList.add("on");
       b.addEventListener("click", function(){ setHvacMode(st.entity_id, m); });
       modes.appendChild(b);
     });
