@@ -343,6 +343,7 @@
 <footer>
   <span id="updated">loading…</span>
   <span class="badge">DEMO DATA</span>
+  <span id="buildTag" style="color:var(--faint); font-size:13px"></span>
 </footer>
 
 <div id="settingsOverlay" hidden>
@@ -423,6 +424,8 @@
  * ------------------------------------------------------------------ */
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
+/* Bump on every deploy; shown in the footer so a device can confirm it's current. */
+const BUILD_TAG = "3d5d4d52-fans+12h";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
@@ -807,6 +810,8 @@ async function load(){
     ? (cfg.length ? stamp + " \u00b7 demo data (feeds unreachable)"
                   : stamp + " \u00b7 demo data \u2014 tap \u2699 to add your feeds")
     : stamp + failedMsg;
+  const bt = document.getElementById("buildTag");
+  if (bt) bt.textContent = "build " + BUILD_TAG;
 }
 
 function renderAll(){
