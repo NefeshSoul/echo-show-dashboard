@@ -426,7 +426,7 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.17a";
+const BUILD_TAG = "2026.10.17b";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
@@ -441,6 +441,14 @@ function getShowModeSetting(){
 function getShow11Setting(){
   try{ return localStorage.getItem(LS_SHOW11) === "1"; }catch(e){ return false; }
 }
+/* No-tap kill switch: opening the page with #show11off (or #show11on) in the
+ * URL clears (or sets) the Show 11 experimental mode without needing the
+ * settings UI — e.g. https://nefeshsoul.github.io/echo-show-dashboard/#show11off */
+try{
+  var _s11h = (location.hash || "").replace(/^#/, "");
+  if (/(^|&)show11=off(&|$)/.test(_s11h)) localStorage.removeItem(LS_SHOW11);
+  else if (/(^|&)show11=on(&|$)/.test(_s11h)) localStorage.setItem(LS_SHOW11, "1");
+}catch(e){}
 /* True on an Echo Show: auto-detected Silk, or the manual override in ⚙. */
 function isShowMode(){
   return IS_SILK || getShowModeSetting();
