@@ -320,7 +320,7 @@
   <section>
     <div class="sechead">
       <h2>Calendar</h2>
-      <div class="seg" role="radiogroup" aria-label="Calendar view">
+      <div class="seg" id="calViewSeg" role="radiogroup" aria-label="Calendar view">
         <button type="button" data-view="agenda" class="on">Agenda</button>
         <button type="button" data-view="week">Week</button>
       </div>
@@ -425,7 +425,7 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.16a";
+const BUILD_TAG = "2026.10.16b";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
@@ -605,7 +605,10 @@ function eventRow(e, isToday, multi){
 function renderCalendar(el, feeds){
   const view = getCalView();
   calEvIndex = [];
-  document.querySelectorAll(".seg button").forEach(b => {
+  /* Scope to the calendar's own segmented control: ".seg button" also
+   * matches the Board/Climate tabs and the thermostat mode buttons, and
+   * this loop was stripping their "on" highlight on every data refresh. */
+  document.querySelectorAll("#calViewSeg button").forEach(b => {
     const on = b.dataset.view === view;
     b.classList.toggle("on", on);
     b.setAttribute("aria-pressed", String(on));
