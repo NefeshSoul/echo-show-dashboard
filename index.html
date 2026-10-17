@@ -362,6 +362,7 @@
     <div class="acct">
       <h3>Echo Show mode</h3>
       <label class="chk"><input type="checkbox" id="showMode"> Keep alive + fullscreen on tap</label>
+      <label class="chk"><input type="checkbox" id="show11Mode"> Show 11 experimental keep-alive (1px video only)</label>
       <p class="hint" id="uaInfo" style="margin:10px 0 0"></p>
     </div>
     <div class="acct">
@@ -425,14 +426,20 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.16b";
+const BUILD_TAG = "2026.10.17a";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
+const LS_SHOW11 = "tb-show11";     // per-device experimental keep-alive (Show 11 only)
 
 /* Manual "this is an Echo Show" override, stored per device. */
 function getShowModeSetting(){
   try{ return localStorage.getItem(LS_SHOWMODE) === "1"; }catch(e){ return false; }
+}
+/* Show 11 experimental keep-alive: runs ONLY the 1px video-file keep-alive,
+ * none of the standard mechanisms — one experiment at a time. */
+function getShow11Setting(){
+  try{ return localStorage.getItem(LS_SHOW11) === "1"; }catch(e){ return false; }
 }
 /* True on an Echo Show: auto-detected Silk, or the manual override in ⚙. */
 function isShowMode(){
@@ -1098,7 +1105,32 @@ load(); setInterval(load, REFRESH_MS);
   document.addEventListener("visibilitychange", function(){
     if (document.visibilityState === "visible") requestWakeLock();
   });
+  /* 5. Show 11 experiment: a real 1px muted looping video FILE (not a canvas
+   * stream, not audio). Community evidence: a tiny muted video feed held Silk
+   * open for a week+ on newer firmware where silent audio did not. The file is
+   * local (keepalive.mp4, ~3KB) so it loops with no network traffic after the
+   * first fetch. Runs alone in Show 11 mode — one experiment at a time. */
+  function startFileVideo(){
+    try{
+      var v = document.createElement("video");
+      v.muted = true; v.loop = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("aria-hidden", "true");
+      v.style.cssText = "position:fixed;width:1px;height:1px;opacity:0.01;pointer-events:none;bottom:0;right:0;";
+      v.src = "keepalive.mp4";
+      document.body.appendChild(v);
+      var played = function(){ state.videoFile = true; };
+      var p = v.play();
+      if (p && p.then) p.then(played).catch(function(){});
+      else played();
+      /* Autoplay may need a user gesture: retry on first tap. */
+      document.addEventListener("pointerdown", function(){
+        try{ var q = v.play(); if (q && q.then) q.then(played).catch(function(){}); }catch(e){}
+      }, {once: true});
+    }catch(e){}
+  }
   function start(){
+    if (getShow11Setting()){ startFileVideo(); return; } /* experiment: video file only */
     startPulse();
     startMediaSession();
     startVideo();
@@ -1114,6 +1146,8 @@ load(); setInterval(load, REFRESH_MS);
   });
   /* Status for the settings panel, so a device can report what actually engaged. */
   window.__keepAliveStatus = function(){
+    if (getShow11Setting())
+      return "video(file) " + (state.videoFile ? "on" : "off") + " [Show 11 experimental mode]";
     return "audio(pulse) " + (state.audio ? "on" : "off") +
       ", video " + (state.video ? "on" : "off") +
       ", wake lock " + (state.wakeLock ? "on" : ("wakeLock" in navigator ? "off" : "unsupported")) +
@@ -1146,6 +1180,7 @@ load(); setInterval(load, REFRESH_MS);
     document.getElementById("calSize").value = getCalSize();
     applyCalSize(getCalSize());
     document.getElementById("showMode").checked = getShowModeSetting();
+    document.getElementById("show11Mode").checked = getShow11Setting();
     updateHaStatus();
     document.getElementById("haMsg").textContent = "";
     document.getElementById("uaInfo").textContent =
@@ -1159,6 +1194,11 @@ load(); setInterval(load, REFRESH_MS);
     try{ localStorage.setItem(LS_SHOWMODE, e.target.checked ? "1" : "0"); }catch(err){}
     document.getElementById("uaInfo").textContent =
       "Saved — reload the page for Echo Show mode to take effect.";
+  });
+  document.getElementById("show11Mode").addEventListener("change", function(e){
+    try{ localStorage.setItem(LS_SHOW11, e.target.checked ? "1" : "0"); }catch(err){}
+    document.getElementById("uaInfo").textContent =
+      "Saved — reload the page for Show 11 mode to take effect.";
   });
   /* ---- Home Assistant pairing ---- */
   function updateHaStatus(){
