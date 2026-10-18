@@ -159,6 +159,8 @@
   .badge{font-size:14px; letter-spacing:2px; padding:5px 14px; border-radius:20px;
     border:1px solid var(--warn); color:var(--warn); display:none}
   body.demo .badge{display:inline-block}
+  #keepOpenButton{background:var(--panel); color:var(--accent); border:1px solid var(--accent);
+    border-radius:10px; padding:10px 14px; font:inherit; cursor:pointer}
 
   .sechead{display:flex; align-items:center; justify-content:space-between;
     margin-bottom:18px; flex:0 0 auto}
@@ -343,6 +345,7 @@
 <footer>
   <span id="updated">loading…</span>
   <span class="badge">DEMO DATA</span>
+  <button id="keepOpenButton" type="button" hidden>Tap to keep open</button>
   <span id="buildTag" style="color:var(--faint); font-size:13px"></span>
 </footer>
 
@@ -363,6 +366,8 @@
       <h3>Echo Show mode</h3>
       <label class="chk"><input type="checkbox" id="showMode"> Keep alive + fullscreen on tap</label>
       <label class="chk"><input type="checkbox" id="show11Mode"> Show 11 experimental keep-alive</label>
+      <p class="hint">For Show 11: enable, reload, then tap “Tap to keep open”.
+        This starts continuous silent audio. Leave the browser's audio unmuted.</p>
       <p class="hint" id="uaInfo" style="margin:10px 0 0"></p>
     </div>
     <div class="acct">
@@ -426,7 +431,7 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.17c";
+const BUILD_TAG = "2026.10.18a";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
@@ -436,8 +441,7 @@ const LS_SHOW11 = "tb-show11";     // per-device experimental keep-alive (Show 1
 function getShowModeSetting(){
   try{ return localStorage.getItem(LS_SHOWMODE) === "1"; }catch(e){ return false; }
 }
-/* Show 11 experimental keep-alive: runs ONLY the 1px video-file keep-alive,
- * none of the standard mechanisms — one experiment at a time. */
+/* Show 11 uses its own continuous, unmuted silent-media player. */
 function getShow11Setting(){
   try{ return localStorage.getItem(LS_SHOW11) === "1"; }catch(e){ return false; }
 }
@@ -446,8 +450,8 @@ function getShow11Setting(){
  * settings UI — e.g. https://nefeshsoul.github.io/echo-show-dashboard/#show11off */
 try{
   var _s11h = (location.hash || "").replace(/^#/, "");
-  if (/(^|&)show11=off(&|$)/.test(_s11h)) localStorage.removeItem(LS_SHOW11);
-  else if (/(^|&)show11=on(&|$)/.test(_s11h)) localStorage.setItem(LS_SHOW11, "1");
+  if (/(^|&)(show11=off|show11off)(&|$)/.test(_s11h)) localStorage.removeItem(LS_SHOW11);
+  else if (/(^|&)(show11=on|show11on)(&|$)/.test(_s11h)) localStorage.setItem(LS_SHOW11, "1");
 }catch(e){}
 /* True on an Echo Show: auto-detected Silk, or the manual override in ⚙. */
 function isShowMode(){
@@ -1004,15 +1008,16 @@ load(); setInterval(load, REFRESH_MS);
 
 /* ------------------------------------------------------------------
  * Silk keep-alive (Echo Show): Silk returns to the home screen after a
- * few idle minutes. Four mechanisms: a *pulsed* silent audio track
- * (fresh media activity every 60s — a plain loop does NOT reset Silk's
- * idle timer), an invisible looping canvas video, the Screen Wake Lock,
- * and a Media Session marked "playing". Fully silent.
+ * few idle minutes. Older devices retain their existing pulsed audio,
+ * canvas video, Screen Wake Lock, and Media Session behavior. Show 11
+ * instead uses continuous unmuted silent audio after a user gesture.
+ * These are best-effort workarounds, not control over Alexa's home timer.
  * Also requests fullscreen on first tap (needs a user gesture), which
  * hides browser chrome in browsers that honor it.
  * ------------------------------------------------------------------ */
 (function silkKeepAlive(){
-  if (!isShowMode()) return; /* keep-alive only matters on the Echo Show; pointless on desktop */
+  var show11Mode = getShow11Setting(); /* stable until reload, just like the UI says */
+  if (!isShowMode() && !show11Mode) return;
   var state = { audio: false, video: false, wakeLock: false, mediaSession: false };
   function silentWavURL(seconds, rate){
     seconds = seconds || 2; rate = rate || 8000;
@@ -1028,13 +1033,7 @@ load(); setInterval(load, REFRESH_MS);
     for (var i = 0; i < n; i++) v.setUint8(44 + i, 128); /* 8-bit silence */
     return URL.createObjectURL(new Blob([buf], {type: "audio/wav"}));
   }
-  /* 1. Pulsed silent audio — the classic "media is playing" signal, done
-   * the way that actually resets Silk's idle timer. A looping track does
-   * NOT do it: per community evidence (openframe's 2026-08 port of the
-   * DaGammla keep-silk-open technique), loop=true "never generated fresh
-   * media/network activity, which is what actually resets Silk's idle
-   * timer". So we play a short silent clip from a FRESH blob URL every
-   * 60s — each start is new media activity for Silk. Fully silent. */
+  /* 1. Existing older-device workaround: a short muted pulse every minute. */
   var PULSE_EVERY_MS = 60000, PULSE_CLIP_S = 3, pulseTimer = null;
   function pulseAudio(){
     try{
@@ -1063,7 +1062,8 @@ load(); setInterval(load, REFRESH_MS);
   }
   /* First tap also triggers an immediate pulse, in case the initial
    * autoplay was blocked and we're waiting on the next 60s tick. */
-  document.addEventListener("pointerdown", function(){ pulseAudio(); }, {once: true});
+  if (!show11Mode)
+    document.addEventListener("pointerdown", function(){ pulseAudio(); }, {once: true});
   /* 2. Media Session: tell the OS a media session is actively playing. */
   function startMediaSession(){
     try{
@@ -1111,47 +1111,107 @@ load(); setInterval(load, REFRESH_MS);
     }catch(e){}
   }
   document.addEventListener("visibilitychange", function(){
-    if (document.visibilityState === "visible") requestWakeLock();
+    if (!show11Mode && document.visibilityState === "visible") requestWakeLock();
   });
-  /* Show 11 experiment: fresh SILENT AUDIO fetched from the network every
-   * 60s. Each cycle fetches silence.mp3 with a cache-buster, so Silk sees
-   * real network + brand-new media activity — the combination community
-   * evidence says actually resets its idle timer (in-memory blob pulses and
-   * a looping local video file were not enough). Runs alone in Show 11
-   * mode — one experiment at a time. */
-  var FETCH_EVERY_MS = 60000, fetchTimer = null;
-  function fetchAudio(){
-    try{
-      if (typeof fetch !== "function") return;
-      fetch("silence.mp3?cb=" + Date.now()).then(function(r){ return r.blob(); }).then(function(blob){
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement("audio");
-        a.muted = true;
-        a.setAttribute("playsinline", "");
-        a.src = url;
-        a.style.display = "none";
-        document.body.appendChild(a);
-        var done = function(){
-          try{ URL.revokeObjectURL(url); }catch(e){}
-          try{ a.remove(); }catch(e){}
-        };
-        a.addEventListener("ended", function(){ done(); });
-        a.addEventListener("error", function(){ done(); });
-        var p = a.play();
-        if (p && p.then) p.then(function(){ state.audioFetch = true; }).catch(function(){ done(); });
-        else state.audioFetch = true;
-      }).catch(function(){});
-    }catch(e){ /* keep-alive is best-effort */ }
-  }
-  function startFetchAudio(){
-    if (fetchTimer) return;
-    fetchAudio();                                   /* first signal immediately */
-    fetchTimer = setInterval(fetchAudio, FETCH_EVERY_MS);
-    /* First tap also triggers an immediate fetch, in case autoplay was blocked. */
-    document.addEventListener("pointerdown", function(){ fetchAudio(); }, {once: true});
+  /* The reference workaround unmutes a silent file after a tap:
+   * https://gitlab.com/DaGammla/keep-silk-open
+   * A muted 3-second blob pulse leaves most of every minute without playback.
+   * Keep ONE unmuted player looping, with a fresh network URL each minute.
+   * Call play() directly in the click handler, before any fetch/await, to
+   * preserve user activation. The file itself is silent; volume stays at 1.
+   * Never claim that successful playback proves Alexa will keep Silk open. */
+  var show11Status = "Tap to start silent audio";
+  function startShow11Audio(){
+    var audio = document.createElement("audio");
+    audio.id = "show11Audio";
+    audio.loop = true;
+    audio.muted = false;
+    audio.volume = 1;
+    audio.preload = "auto";
+    audio.setAttribute("playsinline", "");
+    audio.hidden = true;
+    document.body.appendChild(audio);
+    var button = document.getElementById("keepOpenButton");
+    button.hidden = false;
+    var activated = false, pending = false, attempt = 0;
+    var renewedAt = 0, attemptedAt = 0, progressedAt = 0;
+    var lastTime = -1, renewals = 0;
+    function status(message, needsTap){
+      show11Status = message;
+      button.hidden = !needsTap;
+      button.textContent = activated ? "Retry keep-open audio" : "Tap to keep open";
+    }
+    function play(fresh){
+      if (!activated || document.visibilityState !== "visible") return;
+      if (pending && !fresh) return;
+      if (!fresh && !audio.paused && !audio.ended && audio.readyState >= 3) return;
+      var thisAttempt = ++attempt;
+      pending = true;
+      attemptedAt = Date.now();
+      if (fresh || !audio.getAttribute("src")){
+        renewedAt = Date.now();
+        audio.src = "silence.mp3?cb=" + renewedAt + "-" + (++renewals);
+        audio.load();
+      }
+      status("Starting silent audio", false);
+      function failed(err){
+        if (thisAttempt !== attempt) return;
+        pending = false;
+        status("Silent audio stopped: " + (err.name || "playback error") + "; tap to retry", true);
+      }
+      try{
+        var p = audio.play();
+        if (p && p.then) p.then(function(){
+          if (thisAttempt === attempt) pending = false;
+        }).catch(failed);
+        else pending = false;
+      }catch(e){ failed(e); }
+    }
+    audio.addEventListener("playing", function(){
+      progressedAt = Date.now();
+      lastTime = audio.currentTime;
+      status("Silent audio playing (unmuted)", false);
+    });
+    audio.addEventListener("timeupdate", function(){
+      if (audio.currentTime !== lastTime){
+        lastTime = audio.currentTime;
+        progressedAt = Date.now();
+      }
+    });
+    function mediaError(){
+      pending = false;
+      status("Silent audio error " + (audio.error ? audio.error.code : "unknown") + "; tap to retry", true);
+    }
+    audio.addEventListener("pause", function(){
+      if (audio.error) mediaError();
+      else if (!pending) status("Silent audio paused; tap to resume", true);
+    });
+    audio.addEventListener("error", mediaError);
+    audio.addEventListener("ended", function(){ play(true); });
+    document.addEventListener("click", function(){
+      activated = true;
+      if (audio.paused || audio.error || !audio.getAttribute("src")) play(!!audio.error);
+    });
+    function resume(){
+      if (activated && document.visibilityState === "visible")
+        play(!!audio.error || Date.now() - renewedAt >= 60000);
+    }
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("pageshow", resume);
+    setInterval(function(){
+      if (!activated || document.visibilityState !== "visible") return;
+      var now = Date.now();
+      if (pending && now - attemptedAt < 15000) return;
+      if (pending || audio.error || now - renewedAt >= 60000 || now - progressedAt >= 15000)
+        play(true); /* bounded recovery for failed requests or stalled playback */
+      else if (audio.paused) play(false);
+    }, 10000);
+    window.__show11AudioStatus = function(){
+      return show11Status + "; position " + audio.currentTime.toFixed(1) + "s; loads " + renewals;
+    };
   }
   function start(){
-    if (getShow11Setting()){ startFetchAudio(); return; } /* experiment: fetched audio only */
+    if (show11Mode){ startShow11Audio(); return; }
     startPulse();
     startMediaSession();
     startVideo();
@@ -1167,8 +1227,9 @@ load(); setInterval(load, REFRESH_MS);
   });
   /* Status for the settings panel, so a device can report what actually engaged. */
   window.__keepAliveStatus = function(){
-    if (getShow11Setting())
-      return "audio(fetch) " + (state.audioFetch ? "on" : "off") + " [Show 11 experimental mode]";
+    if (show11Mode)
+      return (window.__show11AudioStatus ? window.__show11AudioStatus() : show11Status) +
+        " [Show 11 experimental mode]";
     return "audio(pulse) " + (state.audio ? "on" : "off") +
       ", video " + (state.video ? "on" : "off") +
       ", wake lock " + (state.wakeLock ? "on" : ("wakeLock" in navigator ? "off" : "unsupported")) +

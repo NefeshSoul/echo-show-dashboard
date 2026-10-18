@@ -201,11 +201,35 @@ local-only setup, or prefer the Apps Script path above.
 
 ## Known limits / things to verify on-device
 
-- **Idle timeout:** the Start directive takes `timeoutInSeconds` (max 1800 =
-  30 min). Docs say the session ends after that long idle; some devices clamp
-  it lower. Worth watching: does the board stay up for hours untouched, or
-  drop back to home? If it drops, options are a periodic silent re-launch via
-  an Alexa routine, or the muted-audio keep-alive trick in the page.
+- **Silk idle timeout:** web playback is a workaround, not a supported kiosk
+  mode. The page cannot prevent Alexa from taking over, or reopen itself once
+  the browser has been closed or suspended. Test on each device/firmware.
+- **Echo Show 11 experiment (build `2026.10.18a`):** enable **Show 11
+  experimental keep-alive** in settings, reload, then tap **Tap to keep open**
+  in the footer. It uses one persistent, **unmuted** audio element playing the
+  silent `silence.mp3` continuously. The short clip loops between fresh,
+  cache-busted media loads every minute. `play()` runs directly in the tap
+  handler, avoiding an asynchronous fetch before user activation. This replaces
+  the muted three-second blob every minute, which left gaps in playback.
+  The audio file is silent; leave browser audio unmuted and volume above zero.
+  This follows the unmute-after-interaction behavior in the
+  [original keep-Silk-open implementation](https://gitlab.com/DaGammla/keep-silk-open).
+  It is still experimental on Show 11; local browser playback tests do not
+  establish whether that device's home-screen timeout will be suppressed.
+- Show 11 playback retries every 10 seconds after pauses, media errors, or
+  stalls while the page is visible, and resumes on returning to the page.
+  Open settings for playback state, media position, and load count. A retry
+  button appears when playback fails. Before an unattended test, confirm that
+  settings report **Silent audio playing (unmuted)** and the position advances.
+  Leave it untouched for longer than its usual timeout, then test overnight.
+  If Alexa still returns home while audio was advancing, an external mechanism
+  to reopen Silk may be needed; more page timers cannot restart a closed app.
+- The Show 11 switch is stored only on that device; older-device keep-alive
+  behavior is retained. `#show11on` / `#show11off` (also `#show11=on` /
+  `#show11=off`) set or clear it on page load. Remove an `on` fragment from the
+  bookmark before disabling the switch, or it will turn back on after reload.
+- **Shelved HTML skill:** its Start directive's idle timeout is separate from
+  the Silk workaround; see the prototype note below.
 - **HTTPS only**, valid cert — no self-signed, no plain HTTP.
 - Touch works inside the page; "Alexa, go home" / "Alexa, exit" closes it.
 - Voice while the board is up goes to the skill (session is open), so
