@@ -362,7 +362,7 @@
     <div class="acct">
       <h3>Echo Show mode</h3>
       <label class="chk"><input type="checkbox" id="showMode"> Keep alive + fullscreen on tap</label>
-      <label class="chk"><input type="checkbox" id="show11Mode"> Show 11 experimental keep-alive (1px video only)</label>
+      <label class="chk"><input type="checkbox" id="show11Mode"> Show 11 experimental keep-alive</label>
       <p class="hint" id="uaInfo" style="margin:10px 0 0"></p>
     </div>
     <div class="acct">
@@ -426,7 +426,7 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.17b";
+const BUILD_TAG = "2026.10.17c";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
@@ -1113,32 +1113,45 @@ load(); setInterval(load, REFRESH_MS);
   document.addEventListener("visibilitychange", function(){
     if (document.visibilityState === "visible") requestWakeLock();
   });
-  /* 5. Show 11 experiment: a real 1px muted looping video FILE (not a canvas
-   * stream, not audio). Community evidence: a tiny muted video feed held Silk
-   * open for a week+ on newer firmware where silent audio did not. The file is
-   * local (keepalive.mp4, ~3KB) so it loops with no network traffic after the
-   * first fetch. Runs alone in Show 11 mode — one experiment at a time. */
-  function startFileVideo(){
+  /* Show 11 experiment: fresh SILENT AUDIO fetched from the network every
+   * 60s. Each cycle fetches silence.mp3 with a cache-buster, so Silk sees
+   * real network + brand-new media activity — the combination community
+   * evidence says actually resets its idle timer (in-memory blob pulses and
+   * a looping local video file were not enough). Runs alone in Show 11
+   * mode — one experiment at a time. */
+  var FETCH_EVERY_MS = 60000, fetchTimer = null;
+  function fetchAudio(){
     try{
-      var v = document.createElement("video");
-      v.muted = true; v.loop = true;
-      v.setAttribute("playsinline", "");
-      v.setAttribute("aria-hidden", "true");
-      v.style.cssText = "position:fixed;width:1px;height:1px;opacity:0.01;pointer-events:none;bottom:0;right:0;";
-      v.src = "keepalive.mp4";
-      document.body.appendChild(v);
-      var played = function(){ state.videoFile = true; };
-      var p = v.play();
-      if (p && p.then) p.then(played).catch(function(){});
-      else played();
-      /* Autoplay may need a user gesture: retry on first tap. */
-      document.addEventListener("pointerdown", function(){
-        try{ var q = v.play(); if (q && q.then) q.then(played).catch(function(){}); }catch(e){}
-      }, {once: true});
-    }catch(e){}
+      if (typeof fetch !== "function") return;
+      fetch("silence.mp3?cb=" + Date.now()).then(function(r){ return r.blob(); }).then(function(blob){
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("audio");
+        a.muted = true;
+        a.setAttribute("playsinline", "");
+        a.src = url;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        var done = function(){
+          try{ URL.revokeObjectURL(url); }catch(e){}
+          try{ a.remove(); }catch(e){}
+        };
+        a.addEventListener("ended", function(){ done(); });
+        a.addEventListener("error", function(){ done(); });
+        var p = a.play();
+        if (p && p.then) p.then(function(){ state.audioFetch = true; }).catch(function(){ done(); });
+        else state.audioFetch = true;
+      }).catch(function(){});
+    }catch(e){ /* keep-alive is best-effort */ }
+  }
+  function startFetchAudio(){
+    if (fetchTimer) return;
+    fetchAudio();                                   /* first signal immediately */
+    fetchTimer = setInterval(fetchAudio, FETCH_EVERY_MS);
+    /* First tap also triggers an immediate fetch, in case autoplay was blocked. */
+    document.addEventListener("pointerdown", function(){ fetchAudio(); }, {once: true});
   }
   function start(){
-    if (getShow11Setting()){ startFileVideo(); return; } /* experiment: video file only */
+    if (getShow11Setting()){ startFetchAudio(); return; } /* experiment: fetched audio only */
     startPulse();
     startMediaSession();
     startVideo();
@@ -1155,7 +1168,7 @@ load(); setInterval(load, REFRESH_MS);
   /* Status for the settings panel, so a device can report what actually engaged. */
   window.__keepAliveStatus = function(){
     if (getShow11Setting())
-      return "video(file) " + (state.videoFile ? "on" : "off") + " [Show 11 experimental mode]";
+      return "audio(fetch) " + (state.audioFetch ? "on" : "off") + " [Show 11 experimental mode]";
     return "audio(pulse) " + (state.audio ? "on" : "off") +
       ", video " + (state.video ? "on" : "off") +
       ", wake lock " + (state.wakeLock ? "on" : ("wakeLock" in navigator ? "off" : "unsupported")) +
