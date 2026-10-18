@@ -65,7 +65,7 @@
   .clock{font-size:88px; font-weight:200; letter-spacing:3px; line-height:1}
   .clock small{font-size:30px; font-weight:400; color:var(--dim); letter-spacing:1px}
   .dateline{text-align:right}
-  .dateline .dow{font-size:34px; font-weight:600}
+  .dateline .dow{font-size:88px; font-weight:600; line-height:1; white-space:nowrap}
   .dateline .date{display:none}
   main{
     flex:1 1 auto; display:flex; flex-direction:column;
@@ -255,6 +255,7 @@
      down; layout and features are unchanged. */
   body.compact header{padding:14px 20px 2px}
   body.compact .clock{font-size:40px}
+  body.compact .dateline .dow{font-size:40px}
   body.compact .dateline{font-size:16px}
   body.compact main{padding:12px 18px}
   body.compact #boardView{gap:14px}
@@ -301,6 +302,7 @@
   @media (orientation:portrait){
     #boardView{grid-template-columns:1fr; grid-template-rows:var(--calpct,50%) 1fr}
     .clock{font-size:64px}
+    .dateline .dow{font-size:64px}
   }
 </style>
 </head>
@@ -431,7 +433,7 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.18b";
+const BUILD_TAG = "2026.10.18c";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
