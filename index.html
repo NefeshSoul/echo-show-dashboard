@@ -66,7 +66,7 @@
   .clock small{font-size:30px; font-weight:400; color:var(--dim); letter-spacing:1px}
   .dateline{text-align:right}
   .dateline .dow{font-size:34px; font-weight:600}
-  .dateline .date{font-size:22px; color:var(--dim); margin-top:4px}
+  .dateline .date{display:none}
   main{
     flex:1 1 auto; display:flex; flex-direction:column;
     padding:26px 52px; min-height:0;
@@ -431,7 +431,7 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.18a";
+const BUILD_TAG = "2026.10.18b";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
@@ -996,9 +996,9 @@ function tickClock(){
     h + ":" + String(d.getMinutes()).padStart(2,"0");
   document.getElementById("ampm").textContent = ap;
   document.getElementById("dow").textContent =
-    d.toLocaleDateString(undefined, {weekday:"long"});
-  document.getElementById("date").textContent =
-    d.toLocaleDateString(undefined, {month:"long", day:"numeric", year:"numeric"});
+    d.toLocaleDateString(undefined, {weekday:"short"}) + " " +
+    (d.getMonth() + 1) + "/" + d.getDate();
+  document.getElementById("date").textContent = "";
 }
 
 tickClock(); setInterval(tickClock, 1000);
