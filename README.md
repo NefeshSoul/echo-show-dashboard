@@ -149,7 +149,9 @@ Per account:
 1. **script.google.com** → New project → paste in `apps-script/Code.gs`.
 2. Project Settings (gear) → Time zone → **(GMT-07:00) Phoenix**.
 3. In the left sidebar, next to **Services**, click **+** (Add a service) →
-   select **Tasks API** → **Add**.
+   select **Tasks API** → **Add**; repeat for **Calendar API** → **Add**.
+   (The Calendar API is what lets the event details popup show recurrence
+   schedules like "Weekly on Mon, Wed".)
 4. Deploy → New deployment → type **Web app** → *Execute as:* Me →
    *Who has access:* **Anyone** → Deploy → authorize → copy the `/exec` URL.
 5. On the Echo Show, tap the **⚙** button → Account 1: label (e.g. `TJ`) +
