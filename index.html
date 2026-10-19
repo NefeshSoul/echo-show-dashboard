@@ -433,7 +433,7 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.18c";
+const BUILD_TAG = "2026.10.18d";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
@@ -984,6 +984,7 @@ function openEventDetail(idx){
     `<h2>${esc(e.title)}</h2>` +
     (dayLine ? `<div class="drow"><b>${esc(dayLine)}</b></div>` : "") +
     `<div class="drow">${esc(when)}</div>` +
+    (e.recur ? `<div class="drow">Repeats&nbsp;<b>${esc(e.recur)}</b></div>` : "") +
     (e.location ? `<div class="drow">\uD83D\uDCCD&nbsp;<b>${esc(e.location)}</b></div>` : "") +
     (e.cal ? `<div class="drow"><span class="cdot" style="background:${c}"></span>&nbsp;${esc(e.cal)}</div>` : "") +
     (e._acct ? `<div class="drow">Account&nbsp;<b>${esc(e._acct)}</b></div>` : "")
