@@ -3,13 +3,17 @@
  *
  * Serves today's calendar agenda + incomplete Google Tasks as JSON/JSONP
  * for the Echo Show dashboard. No OAuth dance: the script runs as you and
- * uses the built-in Calendar service + the Advanced Tasks service.
+ * uses the Advanced Calendar + Tasks services (with a built-in-service
+ * fallback for the agenda if the Calendar service isn't enabled — the
+ * event details popup then just omits the recurrence line).
  *
  * SETUP (5 minutes, one time):
  *  1. Go to script.google.com → New project → paste this file.
  *  2. Project Settings (gear) → Time zone → (GMT-07:00) Phoenix.
  *  3. In the left sidebar, next to **Services**, click **+** (Add a service)
- *     → select **Tasks API** → **Add**.
+ *     → select **Tasks API** → **Add**; repeat for **Calendar API** → **Add**.
+ *     (The Calendar API is what lets the event details popup show
+ *     recurrence schedules like "Weekly on Mon, Wed".)
  *  4. Deploy → New deployment → type: Web app
  *       Execute as: Me
  *       Who has access: Anyone
@@ -169,6 +173,67 @@ function getAgenda() {
   var start = new Date(now); start.setHours(0, 0, 0, 0);
   var end = new Date(now); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999);
 
+  // Prefer the Advanced Calendar service: recurring events carry their RRULE
+  // schedule for the details popup. Falls back to the built-in service
+  // (no recurrence info) if the advanced service isn't enabled.
+  var out = getAgendaAdvanced(start, end);
+  if (!out) out = getAgendaBasic(start, end);
+
+  out.sort(function (a, b) {
+    if (a.start === "All day") return -1;
+    if (b.start === "All day") return 1;
+    return a.start < b.start ? -1 : 1;
+  });
+  return out;
+}
+
+function getAgendaAdvanced(start, end) {
+  try {
+    if (typeof Calendar === "undefined" || !Calendar.Events) return null;
+    var out = [];
+    var cals = (Calendar.CalendarList.list({maxResults: 250}).items) || [];
+    cals.forEach(function (cal) {
+      var pageToken = null;
+      do {
+        var params = {
+          timeMin: start.toISOString(),
+          timeMax: end.toISOString(),
+          singleEvents: true, // expand recurring series into instances
+          orderBy: "startTime",
+          maxResults: 250
+        };
+        if (pageToken) params.pageToken = pageToken;
+        var page = Calendar.Events.list(cal.id, params);
+        (page.items || []).forEach(function (ev) {
+          if (ev.status === "cancelled") return;
+          var declined = (ev.attendees || []).some(function (a) {
+            return a.self && a.responseStatus === "declined";
+          });
+          if (declined) return; // declined
+          var allDay = !!(ev.start && ev.start.date);
+          var s = allDay ? null : new Date(ev.start.dateTime);
+          var en = allDay ? null : new Date(ev.end.dateTime);
+          out.push({
+            date: allDay ? ev.start.date : fmtDate(s),
+            start: allDay ? "All day" : fmtTime(s),
+            end: allDay ? "" : fmtTime(en),
+            title: ev.summary || "",
+            location: ev.location || "",
+            cal: cal.summary || "",
+            recur: friendlyRecurrence(ev.recurrence)
+          });
+        });
+        pageToken = page.nextPageToken;
+      } while (pageToken);
+    });
+    return out;
+  } catch (e) {
+    return null; // e.g. advanced service not enabled -> basic fallback
+  }
+}
+
+function getAgendaBasic(start, end) {
+  // Original built-in-service fetch (no recurrence info).
   var out = [];
   CalendarApp.getAllCalendars().forEach(function (cal) {
     cal.getEvents(start, end).forEach(function (ev) {
@@ -184,12 +249,83 @@ function getAgenda() {
       });
     });
   });
-  out.sort(function (a, b) {
-    if (a.start === "All day") return -1;
-    if (b.start === "All day") return 1;
-    return a.start < b.start ? -1 : 1;
-  });
   return out;
+}
+
+var RRULE_DAYS = {MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat", SU: "Sun"};
+var RRULE_DAYS_FULL = {MO: "Monday", TU: "Tuesday", WE: "Wednesday", TH: "Thursday",
+                       FR: "Friday", SA: "Saturday", SU: "Sunday"};
+var MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function ordinal(n) {
+  if (n % 100 >= 11 && n % 100 <= 13) return n + "th";
+  var d = n % 10;
+  return n + (d === 1 ? "st" : d === 2 ? "nd" : d === 3 ? "rd" : "th");
+}
+
+/* "RRULE:FREQ=WEEKLY;BYDAY=MO,WE" -> "Weekly on Mon, Wed". "" when not recurring. */
+function friendlyRecurrence(recurrence) {
+  if (!recurrence) return "";
+  var rule = "";
+  for (var i = 0; i < recurrence.length; i++) {
+    if (recurrence[i].indexOf("RRULE:") === 0) { rule = recurrence[i].slice(6); break; }
+  }
+  if (!rule) return "";
+  var parts = {};
+  rule.split(";").forEach(function (kv) {
+    var j = kv.indexOf("=");
+    if (j > 0) parts[kv.slice(0, j)] = kv.slice(j + 1);
+  });
+  var freq = parts.FREQ || "";
+  var interval = parseInt(parts.INTERVAL || "1", 10) || 1;
+  var days = (parts.BYDAY || "").split(",").filter(function (d) { return !!d; }).map(function (d) {
+    var m = /^(-?\d+)?([A-Z]{2})$/.exec(d);
+    if (!m) return d;
+    if (m[1]) {
+      // Ordinal ("3TU", "-1FR"): full day name reads naturally — "3rd Tuesday".
+      var n = parseInt(m[1], 10);
+      var full = RRULE_DAYS_FULL[m[2]] || m[2];
+      return (n === -1 ? "last " : ordinal(n) + " ") + full;
+    }
+    return RRULE_DAYS[m[2]] || m[2];
+  });
+  function every(one, many) {
+    return interval === 1 ? one : "Every " + interval + " " + many;
+  }
+  var text = "";
+  if (freq === "DAILY") {
+    text = every("Daily", "days");
+  } else if (freq === "WEEKLY") {
+    text = every("Weekly", "weeks");
+    if (days.length) text += " on " + days.join(", ");
+  } else if (freq === "MONTHLY") {
+    text = every("Monthly", "months");
+    if (days.length) text += " on the " + days.join(", ");
+    else if (parts.BYMONTHDAY) {
+      text += " on the " + parts.BYMONTHDAY.split(",").map(function (n) {
+        return ordinal(parseInt(n, 10));
+      }).join(", ");
+    }
+  } else if (freq === "YEARLY") {
+    text = every("Yearly", "years");
+    if (parts.BYMONTH && parts.BYMONTHDAY) {
+      var mo = MONTH_SHORT[parseInt(parts.BYMONTH, 10) - 1];
+      if (mo) text += " on " + mo + " " + parseInt(parts.BYMONTHDAY, 10);
+    }
+  } else if (freq === "HOURLY") {
+    text = every("Hourly", "hours");
+  } else if (freq) {
+    text = freq.charAt(0) + freq.slice(1).toLowerCase();
+  }
+  if (text && parts.UNTIL) {
+    var u = parts.UNTIL.slice(0, 8); // YYYYMMDD
+    if (/^\d{8}$/.test(u)) {
+      text += " until " + MONTH_SHORT[parseInt(u.slice(4, 6), 10) - 1] + " " +
+        parseInt(u.slice(6, 8), 10) + ", " + u.slice(0, 4);
+    }
+  }
+  return text;
 }
 
 function getTaskLists() {
