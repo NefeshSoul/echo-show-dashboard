@@ -62,11 +62,12 @@
   }
   .sheet .row button.ghost{background:transparent; border:1px solid var(--line);
     color:var(--dim); font-weight:400}
-  .clock{font-size:88px; font-weight:200; letter-spacing:3px; line-height:1}
+  .clock{font-size:88px; font-weight:400; letter-spacing:3px; line-height:1}
   .clock small{font-size:30px; font-weight:400; color:var(--dim); letter-spacing:1px}
   .dateline{text-align:right}
-  .dateline .dow{font-size:88px; font-weight:600; line-height:1; white-space:nowrap}
+  .dateline .dow{font-size:88px; font-weight:400; line-height:1; white-space:nowrap}
   .dateline .date{display:none}
+  .dateline .temp{font-size:30px; color:var(--dim); margin-top:4px}
   main{
     flex:1 1 auto; display:flex; flex-direction:column;
     padding:26px 52px; min-height:0;
@@ -256,6 +257,7 @@
   body.compact header{padding:14px 20px 2px}
   body.compact .clock{font-size:40px}
   body.compact .dateline .dow{font-size:40px}
+  body.compact .dateline .temp{font-size:18px}
   body.compact .dateline{font-size:16px}
   body.compact main{padding:12px 18px}
   body.compact #boardView{gap:14px}
@@ -316,6 +318,7 @@
   <div class="dateline">
     <div class="dow" id="dow">&nbsp;</div>
     <div class="date" id="date">&nbsp;</div>
+    <div class="temp" id="temp"></div>
   </div>
   <button id="settingsBtn" aria-label="Settings" title="Settings">⚙</button>
 </header>
@@ -371,6 +374,11 @@
       <p class="hint">For Show 11: enable, reload, then tap “Tap to keep open”.
         This starts continuous silent audio. Leave the browser's audio unmuted.</p>
       <p class="hint" id="uaInfo" style="margin:10px 0 0"></p>
+    </div>
+    <div class="acct">
+      <h3>Weather</h3>
+      <label>ZIP code<input id="zipCode" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="5" placeholder="85298"></label>
+      <p class="hint">Current temperature in the header (Open-Meteo, US ZIP codes).</p>
     </div>
     <div class="acct">
       <h3>Home Assistant</h3>
@@ -433,11 +441,13 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.18d";
+const BUILD_TAG = "2026.10.21a";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
 const LS_SHOW11 = "tb-show11";     // per-device experimental keep-alive (Show 11 only)
+const LS_ZIP = "tb-zip";           // weather ZIP code (default 85298)
+const LS_GEO = "tb-geo";           // cached {zip, lat, lon} for the weather ZIP
 
 /* Manual "this is an Echo Show" override, stored per device. */
 function getShowModeSetting(){
@@ -1004,7 +1014,42 @@ function tickClock(){
   document.getElementById("date").textContent = "";
 }
 
+/* Current temperature for the header (Open-Meteo — no key, CORS-open).
+ * ZIP -> coords via zippopotam, cached per ZIP in localStorage. */
+function getZip(){
+  try{ return localStorage.getItem(LS_ZIP) || "85298"; }catch(e){ return "85298"; }
+}
+function loadWeather(){
+  const el = document.getElementById("temp");
+  if (!el) return;
+  const zip = getZip();
+  function show(lat, lon){
+    fetch("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
+      "&current=temperature_2m&temperature_unit=fahrenheit")
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        const t = d && d.current ? d.current.temperature_2m : null;
+        el.textContent = (t != null && !isNaN(t)) ? Math.round(t) + "°F" : "";
+      })
+      .catch(function(){});
+  }
+  let geo = null;
+  try{ geo = JSON.parse(localStorage.getItem(LS_GEO) || "null"); }catch(e){}
+  if (geo && geo.zip === zip && geo.lat != null && geo.lon != null){ show(geo.lat, geo.lon); return; }
+  fetch("https://api.zippopotam.us/us/" + encodeURIComponent(zip))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      const p = d && d.places && d.places[0];
+      if (!p){ el.textContent = ""; return; }
+      const g = {zip: zip, lat: parseFloat(p.latitude), lon: parseFloat(p.longitude)};
+      try{ localStorage.setItem(LS_GEO, JSON.stringify(g)); }catch(e){}
+      show(g.lat, g.lon);
+    })
+    .catch(function(){});
+}
+
 tickClock(); setInterval(tickClock, 1000);
+loadWeather(); setInterval(loadWeather, 15 * 60 * 1000);
 applyCalSize(getCalSize());
 loadHidden();
 load(); setInterval(load, REFRESH_MS);
@@ -1266,6 +1311,7 @@ load(); setInterval(load, REFRESH_MS);
     applyCalSize(getCalSize());
     document.getElementById("showMode").checked = getShowModeSetting();
     document.getElementById("show11Mode").checked = getShow11Setting();
+    document.getElementById("zipCode").value = getZip();
     updateHaStatus();
     document.getElementById("haMsg").textContent = "";
     document.getElementById("uaInfo").textContent =
@@ -1284,6 +1330,13 @@ load(); setInterval(load, REFRESH_MS);
     try{ localStorage.setItem(LS_SHOW11, e.target.checked ? "1" : "0"); }catch(err){}
     document.getElementById("uaInfo").textContent =
       "Saved — reload the page for Show 11 mode to take effect.";
+  });
+  document.getElementById("zipCode").addEventListener("change", function(e){
+    const v = String(e.target.value || "").replace(/\D/g, "").slice(0, 5);
+    if (v.length === 5){
+      try{ localStorage.setItem(LS_ZIP, v); }catch(err){}
+      loadWeather();
+    }
   });
   /* ---- Home Assistant pairing ---- */
   function updateHaStatus(){
