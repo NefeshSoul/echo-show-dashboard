@@ -67,7 +67,7 @@
   .dateline{text-align:right}
   .dateline .dow{font-size:88px; font-weight:400; line-height:1; white-space:nowrap}
   .dateline .date{display:none}
-  .dateline .temp{font-size:30px; color:var(--dim); margin-top:4px}
+  header .temp{font-size:40px; color:var(--dim); line-height:1; white-space:nowrap}
   main{
     flex:1 1 auto; display:flex; flex-direction:column;
     padding:26px 52px; min-height:0;
@@ -257,7 +257,7 @@
   body.compact header{padding:14px 20px 2px}
   body.compact .clock{font-size:40px}
   body.compact .dateline .dow{font-size:40px}
-  body.compact .dateline .temp{font-size:18px}
+  body.compact .temp{font-size:22px}
   body.compact .dateline{font-size:16px}
   body.compact main{padding:12px 18px}
   body.compact #boardView{gap:14px}
@@ -311,6 +311,7 @@
 <body>
 <header>
   <div class="clock"><span id="time">--:--</span> <small id="ampm"></small></div>
+  <div class="temp" id="temp"></div>
   <div class="seg" id="viewTabs" role="tablist" aria-label="View">
     <button type="button" data-view="board" class="on" role="tab" aria-selected="true">Board</button>
     <button type="button" data-view="climate" role="tab" aria-selected="false">Climate</button>
@@ -318,7 +319,6 @@
   <div class="dateline">
     <div class="dow" id="dow">&nbsp;</div>
     <div class="date" id="date">&nbsp;</div>
-    <div class="temp" id="temp"></div>
   </div>
   <button id="settingsBtn" aria-label="Settings" title="Settings">⚙</button>
 </header>
@@ -441,7 +441,7 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.21a";
+const BUILD_TAG = "2026.10.21b";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
