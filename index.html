@@ -240,10 +240,13 @@
     border-radius:16px; border:1px solid}
   .detail-card .cdot{width:13px; height:13px; border-radius:50%; flex:0 0 auto;
     align-self:center}
+  .detail-card .dnotes{font-size:20px; line-height:1.45; color:var(--ink);
+    white-space:pre-wrap; word-break:break-word; margin:14px 0 4px}
   .detail-hint{margin-top:18px; font-size:16px; color:var(--faint)}
   body.compact .detail-card{padding:20px; max-width:440px}
   body.compact .detail-card h2{font-size:24px}
   body.compact .detail-card .drow{font-size:16px}
+  body.compact .detail-card .dnotes{font-size:15px}
   button.box{background:none; border:2px solid var(--faint); cursor:pointer; padding:0; font:inherit}
   .event, .evt:not(.none), .task{cursor:pointer}
   .srow{margin:8px 0 2px}
@@ -441,7 +444,7 @@
 const LOCAL_URL = "data.json";
 const REFRESH_MS = 60 * 1000;
 /* Bump on every deploy; shown in the footer so a device can confirm it's current. */
-const BUILD_TAG = "2026.10.21b";
+const BUILD_TAG = "2026.10.23a";
 const LS_FEEDS = "tb-feeds";
 const LS_LEGACY = "tb-data-url"; // migrated from the earlier #fragment mechanism
 const LS_SHOWMODE = "tb-showmode"; // manual "this is an Echo Show" override
@@ -973,6 +976,7 @@ function openTaskDetail(feedIdx, listId, taskId){
     `<h2>${esc(found.title)}</h2>` +
     `<div class="drow"><span class="dchip" style="border-color:${c};color:${c}">${esc(listName)}</span></div>` +
     (due ? `<div class="drow">Due&nbsp;<b>${esc(due)}</b></div>` : "") +
+    (found.notes ? `<div class="dnotes">${esc(found.notes)}</div>` : "") +
     (feed.label ? `<div class="drow">Account&nbsp;<b>${esc(feed.label)}</b></div>` : "") +
     `<div class="detail-hint">Tap the checkbox on the task row to complete it.</div>`
   );
@@ -996,6 +1000,7 @@ function openEventDetail(idx){
     `<div class="drow">${esc(when)}</div>` +
     (e.recur ? `<div class="drow">Repeats&nbsp;<b>${esc(e.recur)}</b></div>` : "") +
     (e.location ? `<div class="drow">\uD83D\uDCCD&nbsp;<b>${esc(e.location)}</b></div>` : "") +
+    (e.desc ? `<div class="dnotes">${esc(e.desc)}</div>` : "") +
     (e.cal ? `<div class="drow"><span class="cdot" style="background:${c}"></span>&nbsp;${esc(e.cal)}</div>` : "") +
     (e._acct ? `<div class="drow">Account&nbsp;<b>${esc(e._acct)}</b></div>` : "")
   );
