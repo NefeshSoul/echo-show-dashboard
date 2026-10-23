@@ -219,6 +219,7 @@ function getAgendaAdvanced(start, end) {
             end: allDay ? "" : fmtTime(en),
             title: ev.summary || "",
             location: ev.location || "",
+            desc: clipText(htmlToText(ev.description)),
             cal: cal.summary || "",
             recur: friendlyRecurrence(ev.recurrence)
           });
@@ -245,6 +246,7 @@ function getAgendaBasic(start, end) {
         end: allDay ? "" : fmtTime(ev.getEndTime()),
         title: ev.getTitle(),
         location: ev.getLocation() || "",
+        desc: clipText(htmlToText(ev.getDescription())),
         cal: cal.getName()
       });
     });
@@ -340,7 +342,8 @@ function getTaskLists() {
       tasks: items
         .filter(function (t) { return t.title; })
         .map(function (t) {
-          return { title: t.title, due: normDue(t.due), id: t.id, list: l.id };
+          return { title: t.title, due: normDue(t.due), id: t.id, list: l.id,
+                   notes: clipText(t.notes) };
         })
     };
   }).filter(function (l) { return l.tasks.length > 0; });
@@ -357,6 +360,24 @@ function fmtTime(d) {
 
 function fmtDate(d) {
   return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+}
+
+function clipText(s) {
+  s = String(s || "").replace(/\n{3,}/g, "\n\n").trim();
+  return s.length > 2000 ? s.slice(0, 2000) + "…" : s;
+}
+
+function htmlToText(s) {
+  s = String(s || "");
+  return s.replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<\/p\s*>/gi, "\n\n")
+          .replace(/<\/?[a-zA-Z][^>]*>/g, "")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, "\"")
+          .replace(/&#39;/g, "'");
 }
 
 function normDue(iso) {
