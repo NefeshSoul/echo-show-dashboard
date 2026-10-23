@@ -151,7 +151,9 @@ Per account:
 3. In the left sidebar, next to **Services**, click **+** (Add a service) →
    select **Tasks API** → **Add**; repeat for **Calendar API** → **Add**.
    (The Calendar API is what lets the event details popup show recurrence
-   schedules like "Weekly on Mon, Wed".)
+   schedules like "Weekly on Mon, Wed".) The script also sends each task's
+   notes and each event's description, which the details popup shows when
+   present.
 4. Deploy → New deployment → type **Web app** → *Execute as:* Me →
    *Who has access:* **Anyone** → Deploy → authorize → copy the `/exec` URL.
 5. On the Echo Show, tap the **⚙** button → Account 1: label (e.g. `TJ`) +
